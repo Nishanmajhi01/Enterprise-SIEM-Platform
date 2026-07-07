@@ -1,0 +1,69 @@
+[
+  {
+    "id": "BRUTE_FORCE_ATTACK",
+    "name": "Brute Force Detection",
+    "enabled": true,
+    "conditions": {
+      "operator": "AND",
+      "rules": [
+        {
+          "field": "failedLogins",
+          "operator": ">=",
+          "value": 5
+        },
+        {
+          "field": "sourceIP",
+          "operator": "exists",
+          "value": true
+        }
+      ]
+    },
+    "severity": "HIGH",
+    "riskScore": 40,
+    "mitre": {
+      "technique": "T1110",
+      "tactic": "Credential Access"
+    }
+  },
+  {
+    "id": "PORT_SCAN_ATTACK",
+    "name": "Port Scanning Activity",
+    "enabled": true,
+    "conditions": {
+      "operator": "OR",
+      "rules": [
+        {
+          "field": "portScan",
+          "operator": "==",
+          "value": true
+        },
+        {
+          "field": "openPorts",
+          "operator": ">=",
+          "value": 20
+        }
+      ]
+    },
+    "severity": "CRITICAL",
+    "riskScore": 60,
+    "mitre": {
+      "technique": "T1046",
+      "tactic": "Discovery"
+    }
+  },
+  {
+    "id": "IOC_MATCH_RULE",
+    "name": "Malicious IOC Match",
+    "enabled": true,
+    "conditions": {
+      "operator": "EXISTS",
+      "field": "iocMatches"
+    },
+    "severity": "CRITICAL",
+    "riskScore": 80,
+    "mitre": {
+      "technique": "T1071",
+      "tactic": "Command and Control"
+    }
+  }
+]
