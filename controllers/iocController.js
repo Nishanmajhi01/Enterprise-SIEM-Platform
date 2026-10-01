@@ -1,4 +1,5 @@
 const IOC = require("../models/IOC");
+const { Op } = require("sequelize");
 const { logAction } = require("../services/auditService");
 
 exports.createIOC = async (req, res) => {
@@ -69,4 +70,116 @@ exports.deleteIOC = async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
+};
+
+exports.getIOCs = async (req, res) => {
+
+    try {
+
+        const iocs = await IOC.findAll({
+
+            order: [
+                ["createdAt", "DESC"]
+            ]
+
+        });
+
+
+        res.json({
+
+            count: iocs.length,
+
+            iocs
+
+        });
+
+
+    } catch (error) {
+
+        res.status(500).json({
+
+            error: error.message
+
+        });
+
+    }
+
+};
+
+
+exports.searchIOCs = async (req, res) => {
+
+    try {
+
+        const { value, type } = req.query;
+
+        const where = {};
+
+        if (value) {
+            where.value = { [Op.iLike]: `%${value}%` };
+        }
+
+        if (type) {
+            where.type = type;
+        }
+
+        const iocs = await IOC.findAll({
+
+            where,
+
+            order: [
+                ["createdAt", "DESC"]
+            ]
+
+        });
+
+        res.json({
+
+            count: iocs.length,
+
+            iocs
+
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+
+            error: error.message
+
+        });
+
+    }
+
+};
+
+
+exports.getIOCById = async (req, res) => {
+
+    try {
+
+        const ioc = await IOC.findByPk(req.params.id);
+
+        if (!ioc) {
+
+            return res.status(404).json({
+
+                error: "IOC not found"
+
+            });
+
+        }
+
+        res.json({ ioc });
+
+    } catch (error) {
+
+        res.status(500).json({
+
+            error: error.message
+
+        });
+
+    }
+
 };

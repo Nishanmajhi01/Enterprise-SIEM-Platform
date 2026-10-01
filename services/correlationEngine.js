@@ -1,111 +1,176 @@
-const Incident = require("../models/Incident");
-const { emitAlert } = require("../utils/socketEmitter");
-const { enrichThreat } = require("../services/threatIntelService");
+const {
+    createSecurityAlert
+} = require("./alertService");
 
-/**
- * 🔥 ENTERPRISE CORRELATION ENGINE
- * IOC + Threat Intel + Rules + Risk Scoring
- */
-exports.runCorrelation = async (event, iocMatches = []) => {
 
-    try {
+const {
+    mapThreat
+} = require("./mitreMapper");
 
-        // ==============================
-        // 1. THREAT INTELLIGENCE ENRICHMENT
-        // ==============================
-        const threatIntel = await enrichThreat(event);
 
-        // ==============================
-        // 2. BASE DETECTION SCORE
-        // ==============================
-        let riskScore = 0;
-        let severity = "LOW";
-        let alert = null;
 
-        // ==============================
-        // 3. IOC MATCHING IMPACT
-        // ==============================
-        if (iocMatches.length > 0) {
-            riskScore += 40;
-        }
+exports.runCorrelation = async(
+    event,
+    iocMatches = [],
+    detection = {}
+)=>{
 
-        // ==============================
-        // 4. THREAT INTEL IMPACT
-        // ==============================
-        if (threatIntel?.virusTotal?.malicious > 10) {
-            riskScore += 50;
-        }
 
-        if (threatIntel?.abuseIPDB?.abuseScore > 50) {
-            riskScore += 30;
-        }
+    const result = {
 
-        // ==============================
-        // 5. BEHAVIOR RULES ENGINE
-        // ==============================
-        if (event.failedLogins > 5) {
-            riskScore += 30;
-        }
 
-        if (event.portScan === true) {
-            riskScore += 40;
-        }
+        event,
 
-        // ==============================
-        // 6. SEVERITY MAPPING
-        // ==============================
-        if (riskScore >= 120) severity = "CRITICAL";
-        else if (riskScore >= 80) severity = "HIGH";
-        else if (riskScore >= 40) severity = "MEDIUM";
+        iocMatches,
 
-        // ==============================
-        // 7. ALERT DECISION
-        // ==============================
-        if (riskScore >= 80) {
-            alert = "MALICIOUS ACTIVITY DETECTED";
-        }
+        detection,
 
-        const result = {
-            event,
-            iocMatches,
-            threatIntel,
-            detection: {
-                alert,
-                severity,
-                riskScore,
-                mitre: {
-                    technique: "T1071",
-                    tactic: "Command and Control",
-                    name: "Network Communication"
-                }
-            },
-            timestamp: new Date()
-        };
+        timestamp:new Date()
 
-        // ==============================
-        // 8. REAL-TIME ALERTING
-        // ==============================
-        if (alert) {
-            emitAlert(result);
 
-            await Incident.create({
-                title: alert,
-                attackType: event.attackType || "UNKNOWN",
-                severity,
-                sourceIP: event.sourceIP,
-                status: "OPEN"
-            });
-        }
+    };
+
+
+
+
+
+    // No detection matched
+
+    if(
+        !detection ||
+        !detection.alert
+    ){
 
         return result;
 
-    } catch (error) {
-        console.log("Correlation Engine Error:", error.message);
-
-        return {
-            event,
-            error: "Correlation failed",
-            timestamp: new Date()
-        };
     }
+
+
+
+
+
+
+
+    // ==============================
+    // MITRE MAPPING
+    // ==============================
+
+
+    const mitre =
+    detection.mitre
+    ||
+    mapThreat(
+        event.attackType || "UNKNOWN"
+    );
+
+
+
+
+
+
+
+
+
+    // ==============================
+    // CREATE ALERT
+    // ==============================
+
+
+    const securityResult =
+    await createSecurityAlert({
+
+
+
+        title:
+        detection.alert,
+
+
+
+        description:
+        `Security detection triggered from ${event.sourceIP}`,
+
+
+
+        severity:
+        detection.severity || "LOW",
+
+
+
+        sourceIP:
+        event.sourceIP,
+
+
+
+        attackType:
+        event.attackType || "UNKNOWN",
+
+
+
+        riskScore:
+        detection.riskScore || 0,
+
+
+
+        mitreTechnique:
+        mitre.technique,
+
+
+
+        tactic:
+        mitre.tactic,
+
+
+
+        evidence:{
+
+            event,
+
+            iocMatches
+
+        }
+
+
+    });
+
+
+
+
+
+
+
+
+    result.alertId =
+    securityResult.alert.id;
+
+
+
+
+    if(
+    securityResult.incident
+){
+
+
+    result.incidentId =
+    securityResult.incident.id;
+
+
+    await event.update({
+
+        incidentId:
+        securityResult.incident.id
+
+    });
+
+
+}
+
+
+
+
+
+
+
+    return result;
+
+
 };

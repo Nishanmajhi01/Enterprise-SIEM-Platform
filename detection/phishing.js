@@ -1,73 +1,150 @@
-const Alert=require("../models/Alert");
+const {
+    createSecurityAlert
+} = require("../services/alertService");
+
 
 
 async function detectPhishing(url){
 
 
-const suspiciousWords=[
 
-"login",
+    const suspiciousWords = [
 
-"verify",
+        "login",
 
-"update",
+        "verify",
 
-"password",
+        "update",
 
-"bank"
+        "password",
 
-];
+        "bank"
 
-
-let found=false;
+    ];
 
 
 
-for(let word of suspiciousWords){
+
+    let found = false;
+
+    let matchedWord = "";
 
 
-if(url.includes(word)){
 
-found=true;
+
+
+    for(let word of suspiciousWords){
+
+
+        if(url.toLowerCase().includes(word)){
+
+
+            found = true;
+
+            matchedWord = word;
+
+            break;
+
+        }
+
+
+    }
+
+
+
+
+
+    if(found){
+
+
+
+        await createSecurityAlert({
+
+
+
+            title:
+            "Phishing URL Detected",
+
+
+
+
+            description:
+            `Suspicious phishing URL detected containing keyword "${matchedWord}": ${url}`,
+
+
+
+
+            severity:
+            "HIGH",
+
+
+
+
+            sourceIP:
+            null,
+
+
+
+
+            attackType:
+            "PHISHING",
+
+
+
+
+            mitreTechnique:
+            "T1566",
+
+
+
+
+            tactic:
+            "Initial Access",
+
+
+
+
+            riskScore:
+            80
+
+
+
+        });
+
+
+
+
+
+
+        console.log(
+
+            "PHISHING DETECTED:",
+            url
+
+        );
+
+
+
+
+
+        return true;
+
+
+
+    }
+
+
+
+
+
+    return false;
+
+
 
 }
 
-}
 
 
 
-if(found){
 
-
-await Alert.create({
-
-attackType:
-"PHISHING",
-
-riskLevel:
-"HIGH",
-
-message:
-`Suspicious phishing URL detected: ${url}`
-
-});
-
-
-console.log(
-"PHISHING DETECTED"
-);
-
-
-return true;
-
-
-}
-
-
-return false;
-
-
-}
-
-
-module.exports=detectPhishing;
+module.exports = detectPhishing;

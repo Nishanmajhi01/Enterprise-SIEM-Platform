@@ -1,28 +1,100 @@
 const { Server } = require("socket.io");
 const { setIO } = require("../utils/socketEmitter");
 
-let io;
+let io = null;
+
+
+/*
+========================================
+INITIALIZE SOCKET.IO SERVER
+========================================
+*/
 
 const initSocket = (server) => {
 
     io = new Server(server, {
+
         cors: {
-            origin: "*"
-        }
+
+            origin: "http://localhost:5173",
+
+            methods: [
+                "GET",
+                "POST"
+            ],
+
+            credentials: true
+
+        },
+
+        transports: [
+            "polling",
+            "websocket"
+        ]
+
     });
+
 
     io.on("connection", (socket) => {
 
-        console.log("Client connected:", socket.id);
+        console.log(
+            "SOC Dashboard Connected:",
+            socket.id
+        );
+
 
         socket.on("disconnect", () => {
-            console.log("Client disconnected");
+
+            console.log(
+                "SOC Dashboard Disconnected:",
+                socket.id
+            );
+
         });
 
     });
 
-    setIO(io); // 🔥 IMPORTANT
+
+    // Used by socketEmitter.js
+    setIO(io);
 
 };
 
-module.exports = { initSocket };
+
+
+/*
+========================================
+SEND REAL-TIME ALERTS
+========================================
+*/
+
+const sendAlert = (data) => {
+
+    if (!io) {
+
+        console.log(
+            "Socket.IO not initialized."
+        );
+
+        return;
+
+    }
+
+    io.emit("security-alert", data);
+
+};
+
+
+
+/*
+========================================
+EXPORTS
+========================================
+*/
+
+module.exports = {
+
+    initSocket,
+    sendAlert
+
+};

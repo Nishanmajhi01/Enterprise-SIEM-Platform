@@ -2,8 +2,8 @@ const normalizeEvent=
 require("./utils/eventNormalizer");
 
 
-const getMitreTechnique=
-require("./utils/mitreMapping");
+const { mapThreat: getMitreTechnique }=
+require("./services/mitreMapper");
 
 
 

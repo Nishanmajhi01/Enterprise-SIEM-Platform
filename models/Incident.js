@@ -1,153 +1,193 @@
-const {DataTypes}=require("sequelize");
-
-const {sequelize}=require("../config/database");
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../config/database");
 
 
 const Incident = sequelize.define(
-
 "Incident",
-
 {
 
-
 id:{
-
-type:DataTypes.INTEGER,
-
-autoIncrement:true,
-
-primaryKey:true
-
+    type:DataTypes.INTEGER,
+    autoIncrement:true,
+    primaryKey:true
 },
 
 
 
 title:{
-
-type:DataTypes.STRING,
-
-allowNull:false
-
+    type:DataTypes.STRING,
+    allowNull:false
 },
 
 
 
 attackType:{
+    type:DataTypes.STRING,
+    allowNull:false
+},
 
-type:DataTypes.STRING,
-
-allowNull:false
-
+scanType: {
+    type: DataTypes.STRING,
+    allowNull: true
 },
 
 
 
-// MITRE ATT&CK Information
-
 mitreTechnique:{
-
-type:DataTypes.STRING
-
+    type:DataTypes.STRING,
+    allowNull:true
 },
 
 
 
 tactic:{
-
-type:DataTypes.STRING
-
+    type:DataTypes.STRING,
+    allowNull:true
 },
 
 
 
-// Risk Management
-
 severity:{
-
-type:DataTypes.STRING,
-
-defaultValue:"LOW"
-
+    type:DataTypes.ENUM(
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+    ),
+    defaultValue:"LOW"
 },
 
 
 
 riskScore:{
+    type:DataTypes.INTEGER,
+    defaultValue:0
+},
 
-type:DataTypes.INTEGER,
 
-defaultValue:0
-
+relatedAlerts:{
+    type:DataTypes.INTEGER,
+    defaultValue:1
 },
 
 
 
-// Investigation Information
+alertId:{
+    type:DataTypes.INTEGER,
+    allowNull:true
+},
+
+
 
 sourceIP:{
-
-type:DataTypes.STRING
-
-},
-
-
-
-evidence:{
-
-type:DataTypes.JSON
-
+    type:DataTypes.STRING,
+    allowNull:true
 },
 
 
 
 description:{
+    type:DataTypes.TEXT,
+    allowNull:true
+},
 
-type:DataTypes.TEXT
 
+
+evidence:{
+    type:DataTypes.JSONB,
+    defaultValue:[]
 },
 
 
 
 recommendation:{
-
-type:DataTypes.TEXT
-
+    type:DataTypes.TEXT,
+    allowNull:true
 },
 
 
 
-// SOC Workflow
 
 status:{
-
-type:DataTypes.STRING,
-
-defaultValue:"OPEN"
-
+    type:DataTypes.ENUM(
+        "OPEN",
+        "ACKNOWLEDGED",
+        "INVESTIGATING",
+        "CONTAINED",
+        "RESOLVED",
+        "CLOSED"
+    ),
+    defaultValue:"OPEN"
 },
 
 
 
 assignedTo:{
+    type:DataTypes.INTEGER,
+    allowNull:true
+},
 
-type:DataTypes.STRING
 
+
+resolvedBy:{
+    type:DataTypes.INTEGER,
+    allowNull:true
+},
+
+
+
+resolutionNote:{
+    type:DataTypes.TEXT,
+    allowNull:true
+},
+closedBy:{
+    type:DataTypes.INTEGER,
+    allowNull:true
+},
+
+
+closedAt:{
+    type:DataTypes.DATE,
+    allowNull:true
+},
+
+
+closureNote:{
+    type:DataTypes.TEXT,
+    allowNull:true
+},
+
+
+
+timeline:{
+    type:DataTypes.JSONB,
+    defaultValue:[]
 }
 
 
 
 },
-
-
 {
 
-timestamps:true
+timestamps:true,
 
+indexes:[
+
+{
+fields:["severity"]
+},
+
+{
+fields:["status"]
+},
+
+{
+fields:["attackType"]
 }
 
+]
 
-);
+});
 
 
-
-module.exports=Incident;
+module.exports = Incident;

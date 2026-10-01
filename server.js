@@ -1,5 +1,11 @@
 require("dotenv").config();
 require("./models/IOC");
+require("./models/ThreatIntel");
+require("./models/Alert");
+require("./models/Incident");
+require("./models/IncidentComment");
+require("./models/associations");
+require("./models/Evidence");
 
 const express = require("express");
 const cors = require("cors");
@@ -15,7 +21,13 @@ const app = express();
  * SECURITY CORE MIDDLEWARE
  * =========================
  */
-app.use(cors());
+app.use(cors({
+
+    origin:"http://localhost:5173",
+
+    credentials:true
+
+}));
 app.use(helmet());
 app.use(express.json());
 
@@ -46,6 +58,10 @@ const iocRoutes = require("./routes/iocRoutes");
 const correlationRoutes = require("./routes/correlationRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const ingestRoutes = require("./routes/ingestRoutes");
+const searchRoutes =require("./routes/searchRoutes");
+const playbookRoutes =require("./routes/playbookRoutes");
+const deviceRoutes = require("./routes/deviceRoutes");
+const testRoutes = require("./routes/testRoutes");
 
 /**
  * =========================
@@ -57,7 +73,14 @@ const ingestRoutes = require("./routes/ingestRoutes");
 app.use(requestLogger);
 
 // 2. Rate Limiter (protect API)
-app.use(limiter);
+// SIEM ingestion is excluded because log collectors generate high-volume traffic.
+app.use((req, res, next) => {
+    if (req.path.startsWith("/api/ingest")) {
+        return next();
+    }
+
+    return limiter(req, res, next);
+});
 
 /**
  * =========================
@@ -77,6 +100,10 @@ app.use("/api/iocs", iocRoutes);
 app.use("/api/correlation", correlationRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/ingest", ingestRoutes);
+app.use("/api/search",searchRoutes);
+app.use("/api/test",testRoutes);
+app.use("/api/playbooks",playbookRoutes);
+app.use("/api/devices",deviceRoutes);
 
 
 /**
@@ -112,7 +139,9 @@ const startServer = async () => {
 
         // Connect DB
         await connectDatabase();
-        await sequelize.sync();
+        await sequelize.sync({
+    alter:true
+});
 
         logger.info("Database Connected Successfully");
 

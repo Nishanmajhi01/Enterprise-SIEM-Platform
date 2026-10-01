@@ -1,5 +1,5 @@
-const getMitreTechnique =
-require("./mitreMapping");
+const { mapThreat } =
+require("../services/mitreMapper");
 
 
 
@@ -8,7 +8,7 @@ function generateAlert(correlation,event){
 
 
 const mitre =
-getMitreTechnique(
+mapThreat(
 correlation.attackType
 );
 

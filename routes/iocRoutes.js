@@ -4,6 +4,8 @@ const router = express.Router();
 const {
     createIOC,
     getIOCs,
+    searchIOCs,
+    getIOCById,
     updateIOC,
     deleteIOC
 } = require("../controllers/iocController");
@@ -33,6 +35,29 @@ router.get(
     authenticate,
     rbac(["ADMIN", "ANALYST", "VIEWER"]),
     getIOCs
+);
+
+/**
+ * SEARCH IOC
+ * ADMIN + ANALYST + VIEWER
+ * Must be registered before /:id
+ */
+router.get(
+    "/search",
+    authenticate,
+    rbac(["ADMIN", "ANALYST", "VIEWER"]),
+    searchIOCs
+);
+
+/**
+ * GET SINGLE IOC
+ * ADMIN + ANALYST + VIEWER
+ */
+router.get(
+    "/:id",
+    authenticate,
+    rbac(["ADMIN", "ANALYST", "VIEWER"]),
+    getIOCById
 );
 
 /**

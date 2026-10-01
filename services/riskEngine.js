@@ -1,96 +1,236 @@
-const rules = require("../config/detectionRules.json");
-
 /**
- * 🔥 OPERATORS (SOC STYLE)
+ * Enterprise SIEM Risk Engine
+ *
+ * Calculates final risk score using:
+ * - Detection rule score
+ * - IOC reputation
+ * - Threat Intelligence
+ * - Severity impact
+ * - MITRE impact
  */
-const operators = {
 
-    "==": (a, b) => a == b,
-    "!=": (a, b) => a != b,
-    ">": (a, b) => a > b,
-    "<": (a, b) => a < b,
-    ">=": (a, b) => a >= b,
-    "<=": (a, b) => a <= b,
 
-    "contains": (a, b) => {
-        if (Array.isArray(a)) return a.includes(b);
-        if (typeof a === "string") return a.includes(b);
-        return false;
-    },
+exports.calculateRisk = (
+    event,
+    iocMatches = [],
+    detection = {}
+) => {
 
-    "exists": (a) => {
-        return a !== undefined && a !== null;
+
+    let riskScore = 0;
+
+
+
+    // 1. Detection Rule Risk
+
+    if (detection.riskScore) {
+
+        riskScore += detection.riskScore;
+
     }
-};
 
-/**
- * 🔥 CONDITION EVALUATOR (RECURSIVE)
- */
-const evaluateConditionGroup = (event, conditionGroup) => {
 
-    const { operator, rules: conditions } = conditionGroup;
 
-    const results = conditions.map(cond => {
+    // 2. IOC Reputation Risk
 
-        // SIMPLE CONDITION
-        if (cond.operator === "exists") {
-            return operators.exists(event[cond.field]);
+    if (iocMatches.length > 0) {
+
+        riskScore += 30;
+
+    }
+
+
+
+    // 3. Threat Intelligence Risk
+
+    const threatIntel =
+        event.threatIntel;
+
+
+
+    if (threatIntel) {
+
+
+        // VirusTotal
+
+        const malicious =
+        threatIntel
+        ?.virusTotal
+        ?.malicious || 0;
+
+
+
+        if (malicious > 0) {
+
+            riskScore += 30;
+
         }
 
-        return operators[cond.operator](
-            event[cond.field],
-            cond.value
-        );
-    });
 
-    if (operator === "AND") {
-        return results.every(Boolean);
-    }
+        if (malicious > 10) {
 
-    if (operator === "OR") {
-        return results.some(Boolean);
-    }
+            riskScore += 20;
 
-    return false;
-};
-
-/**
- * 🔥 MAIN RULE ENGINE (INDUSTRIAL)
- */
-exports.evaluateRules = (event, iocMatches = []) => {
-
-    let alerts = [];
-    let totalRisk = 0;
-
-    for (let rule of rules) {
-
-        if (!rule.enabled) continue;
-
-        let match = false;
-
-        // IOC shortcut optimization
-        if (rule.id === "IOC_MATCH_RULE" && iocMatches.length > 0) {
-            match = true;
-        } else {
-            match = evaluateConditionGroup(event, rule.conditions);
         }
 
-        if (match) {
 
-            alerts.push({
-                ruleId: rule.id,
-                name: rule.name,
-                severity: rule.severity,
-                riskScore: rule.riskScore,
-                mitre: rule.mitre
-            });
 
-            totalRisk += rule.riskScore;
+        // AbuseIPDB
+
+        const abuseScore =
+        threatIntel
+        ?.abuseIPDB
+        ?.abuseScore || 0;
+
+
+
+        if (abuseScore > 50) {
+
+            riskScore += 20;
+
         }
+
+
+        if (abuseScore > 80) {
+
+            riskScore += 20;
+
+        }
+
+
+
+        // Threat confidence
+
+        riskScore +=
+        threatIntel.confidenceScore || 0;
+
+
     }
+
+
+
+    // 4. Severity Weight
+
+    switch(
+        event.severity
+    ){
+
+        case "CRITICAL":
+
+            riskScore += 30;
+
+            break;
+
+
+        case "HIGH":
+
+            riskScore += 25;
+
+            break;
+
+
+        case "MEDIUM":
+
+            riskScore += 15;
+
+            break;
+
+
+        default:
+
+            riskScore += 5;
+
+    }
+
+
+
+    if(event.attackType === "BRUTE_FORCE"){
+
+    riskScore +=20;
+
+}
+
+
+if(event.attackType === "MALWARE"){
+
+    riskScore +=25;
+
+}
+
+
+if(event.attackType === "DATA_EXFILTRATION"){
+
+    riskScore +=30;
+
+}
+
+
+
+    // 5. Limit Score
+
+    if(riskScore > 100){
+
+        riskScore = 100;
+
+    }
+
+
+
+    // Risk Category
+
+    let level;
+
+
+    if(riskScore >= 90){
+
+        level="CRITICAL";
+
+    }
+    else if(riskScore >= 70){
+
+        level="HIGH";
+
+    }
+    else if(riskScore >= 40){
+
+        level="MEDIUM";
+
+    }
+    else{
+
+        level="LOW";
+
+    }
+
+
 
     return {
-        alerts,
-        totalRisk
+
+
+        score:riskScore,
+
+        level,
+
+
+        factors:{
+
+
+            detectionRisk:
+            detection.riskScore || 0,
+
+
+            iocDetected:
+            iocMatches.length > 0,
+
+
+            threatIntelUsed:
+            !!threatIntel
+
+
+        }
+
+
     };
+
+
 };

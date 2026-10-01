@@ -1,16 +1,25 @@
-const {DataTypes}=require("sequelize");
+const { DataTypes } = require("sequelize");
+const { sequelize } = require("../config/database");
 
-const {sequelize}=require("../config/database");
 
+const SecurityEvent = sequelize.define("SecurityEvent", {
 
-const SecurityEvent = sequelize.define(
-"SecurityEvent",
-{
 
 id:{
 type:DataTypes.INTEGER,
 autoIncrement:true,
 primaryKey:true
+},
+
+
+deviceId:{
+type:DataTypes.INTEGER,
+allowNull:true
+},
+
+incidentId:{
+    type:DataTypes.INTEGER,
+    allowNull:true
 },
 
 
@@ -20,9 +29,29 @@ allowNull:false
 },
 
 
+severity:{
+type:DataTypes.ENUM(
+"LOW",
+"MEDIUM",
+"HIGH",
+"CRITICAL"
+),
+defaultValue:"LOW"
+},
+
+riskScore:{
+    type:DataTypes.INTEGER,
+    defaultValue:0
+},
+
+
 sourceIP:{
-type:DataTypes.STRING,
-allowNull:false
+type:DataTypes.STRING
+},
+
+
+destinationIP:{
+type:DataTypes.STRING
 },
 
 
@@ -31,30 +60,30 @@ type:DataTypes.STRING
 },
 
 
-description:{
+message:{
 type:DataTypes.TEXT
 },
 
 
-severity:{
-type:DataTypes.STRING,
-defaultValue:"LOW"
+attackType:{
+type:DataTypes.STRING
 },
 
 
-status:{
-type:DataTypes.STRING,
-defaultValue:"NEW"
+raw:{
+type:DataTypes.JSONB
+},
+
+
+timestamp:{
+type:DataTypes.DATE,
+defaultValue:DataTypes.NOW
 }
 
 
-},
-
-{
+},{
 timestamps:true
-}
-
-);
+});
 
 
-module.exports=SecurityEvent;
+module.exports = SecurityEvent;

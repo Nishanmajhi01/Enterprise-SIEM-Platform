@@ -1,56 +1,98 @@
-exports.detectAttack = (event, iocMatches) => {
+const rules = require("../config/detectionRules.json");
 
-    let alert = null;
-    let severity = "LOW";
-    let mitre = null;
-    let riskScore = 10;
+/**
+ * 🔥 OPERATORS (SOC STYLE)
+ */
+const operators = {
 
-    // RULE 1: Brute Force Detection
-    if (event.failedLogins >= 5) {
+    "==": (a, b) => a == b,
+    "!=": (a, b) => a != b,
+    ">": (a, b) => a > b,
+    "<": (a, b) => a < b,
+    ">=": (a, b) => a >= b,
+    "<=": (a, b) => a <= b,
 
-        alert = "BRUTE FORCE DETECTED";
-        severity = "HIGH";
-        riskScore += 60;
+    "contains": (a, b) => {
+        if (Array.isArray(a)) return a.includes(b);
+        if (typeof a === "string") return a.includes(b);
+        return false;
+    },
 
-        mitre = {
-            technique: "T1110",
-            tactic: "Credential Access",
-            name: "Brute Force"
-        };
+    "exists": (a) => {
+        return a !== undefined && a !== null;
+    }
+};
+
+/**
+ * 🔥 CONDITION EVALUATOR (RECURSIVE)
+ */
+const evaluateConditionGroup = (event, conditionGroup) => {
+
+    const { operator, rules: conditions } = conditionGroup;
+
+    const results = conditions.map(cond => {
+
+        // SIMPLE CONDITION
+        if (cond.operator === "exists") {
+            return operators.exists(event[cond.field]);
+        }
+
+        return operators[cond.operator](
+            event[cond.field],
+            cond.value
+        );
+    });
+
+    if (operator === "AND") {
+        return results.every(Boolean);
     }
 
-    // RULE 2: IOC Match (critical)
-    if (iocMatches.length > 0) {
-
-        alert = "MALICIOUS IOC DETECTED";
-        severity = "CRITICAL";
-        riskScore += 80;
-
-        mitre = {
-            technique: "T1071",
-            tactic: "Command and Control",
-            name: "Known Bad Indicator"
-        };
+    if (operator === "OR") {
+        return results.some(Boolean);
     }
 
-    // RULE 3: Suspicious Activity
-    if (event.portScan === true) {
+    return false;
+};
 
-        alert = "PORT SCANNING DETECTED";
-        severity = "MEDIUM";
-        riskScore += 40;
+/**
+ * 🔥 MAIN RULE ENGINE (INDUSTRIAL)
+ */
+exports.evaluateRules = (event, iocMatches = []) => {
 
-        mitre = {
-            technique: "T1046",
-            tactic: "Discovery",
-            name: "Network Scan"
-        };
+    let alerts = [];
+    let totalRisk = 0;
+
+    for (let rule of rules) {
+
+        if (!rule.enabled) continue;
+
+        let match = false;
+
+        // IOC_MATCH_RULE's condition is a plain existence check on
+        // iocMatches, not an AND/OR rules[] group — short-circuit instead
+        // of handing it to evaluateConditionGroup.
+        if (rule.id === "IOC_MATCH_RULE") {
+            match = iocMatches.length > 0;
+        } else {
+            match = evaluateConditionGroup(event, rule.conditions);
+        }
+
+        if (match) {
+
+            alerts.push({
+                ruleId: rule.id,
+                name: rule.name,
+                severity: rule.severity,
+                riskScore: rule.riskScore,
+                mitre: rule.mitre
+            });
+
+            totalRisk += rule.riskScore;
+        }
     }
 
     return {
-        alert,
-        severity,
-        riskScore,
-        mitre
+        alerts,
+        totalRisk
     };
 };
