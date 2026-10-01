@@ -1,84 +1,170 @@
-// services/responseExecutor.js
-
 const net = require("net");
+const { execFile } = require("child_process");
+const { promisify } = require("util");
+
+const execFileAsync = promisify(execFile);
+
+// ========================================================
+// PFSENSE CONFIGURATION
+// ========================================================
+
+const PFSENSE_HOST = "192.168.56.2";
+const PFSENSE_USER = "admin";
+
+const SSH_KEY =
+    "/home/siemadmin/.ssh/siem_pfsense";
+
+const BLOCK_TABLE = "SIEM_BLOCKLIST";
+
 
 // ========================================================
 // PROTECTED IPS
-// Never automatically block critical infrastructure
+// These addresses must never be automatically blocked.
 // ========================================================
 
 const PROTECTED_IPS = new Set([
     "127.0.0.1",
     "::1",
 
-    // ubuntu siem
+    // Ubuntu SIEM
     "192.168.1.10",
 
-    // pfSense 
-    "192.168.56.2"
+    // pfSense LAN
+    "192.168.1.1",
+
+    // pfSense OPT1 management
+    "192.168.56.2",
+
+    // Windows management host-only adapter
+    "192.168.56.1"
 ]);
 
 
 // ========================================================
-// PRIVATE IP CHECK
+// IP VALIDATION
 // ========================================================
 
-function isValidIP(ip) {
+function validateTargetIP(ip) {
 
-    return net.isIP(ip) !== 0;
+    if (!ip || typeof ip !== "string") {
+        throw new Error("Target IP is required");
+    }
 
+    const target = ip.trim();
+
+    if (net.isIP(target) === 0) {
+        throw new Error(`Invalid IP address: ${target}`);
+    }
+
+    if (PROTECTED_IPS.has(target)) {
+        throw new Error(
+            `Protected IP cannot be blocked: ${target}`
+        );
+    }
+
+    return target;
 }
 
 
 // ========================================================
-// BLOCK IP - SIMULATION MODE
-// Real pfSense integration comes later
+// EXECUTE PFSENSE COMMAND
+// ========================================================
+
+async function executePfSenseCommand(operation, ip) {
+
+    if (!["add", "delete"].includes(operation)) {
+        throw new Error(
+            `Invalid pfSense table operation: ${operation}`
+        );
+    }
+
+    const remoteCommand =
+        `/sbin/pfctl -t ${BLOCK_TABLE} -T ${operation} ${ip}`;
+
+    const sshArguments = [
+        "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes",
+        "-o", "ConnectTimeout=5",
+        "-i", SSH_KEY,
+        `${PFSENSE_USER}@${PFSENSE_HOST}`,
+        remoteCommand
+    ];
+
+    const { stdout, stderr } = await execFileAsync(
+        "/usr/bin/ssh",
+        sshArguments,
+        {
+            timeout: 10000,
+            maxBuffer: 1024 * 1024
+        }
+    );
+
+    return {
+        stdout: stdout.trim(),
+        stderr: stderr.trim()
+    };
+}
+
+
+// ========================================================
+// BLOCK IP
 // ========================================================
 
 async function blockIP(ip) {
 
-    if (!ip || !isValidIP(ip)) {
-
-        throw new Error(
-            `Invalid IP address: ${ip}`
-        );
-
-    }
-
-
-    if (PROTECTED_IPS.has(ip)) {
-
-        throw new Error(
-            `Protected IP cannot be blocked: ${ip}`
-        );
-
-    }
-
+    const target = validateTargetIP(ip);
 
     console.log(
-        `RESPONSE EXECUTOR: BLOCK_IP requested for ${ip}`
+        `RESPONSE EXECUTOR: Blocking ${target} via pfSense`
     );
 
-
-    // IMPORTANT:
-    // We are still in simulation mode.
-    // No firewall rule is changed yet.
+    const result = await executePfSenseCommand(
+        "add",
+        target
+    );
 
     return {
-
         success: true,
-
-        simulated: true,
-
+        simulated: false,
         action: "BLOCK_IP",
-
-        target: ip,
-
+        target,
+        firewall: "pfSense",
+        table: BLOCK_TABLE,
+        output: result.stdout,
         message:
-            `Simulated firewall block for ${ip}`
-
+            `IP ${target} added to ${BLOCK_TABLE}`
     };
+}
 
+
+// ========================================================
+// UNBLOCK IP
+// ========================================================
+
+async function unblockIP(ip) {
+
+    const target = validateTargetIP(ip);
+
+    console.log(
+        `RESPONSE EXECUTOR: Unblocking ${target} via pfSense`
+    );
+
+    const result = await executePfSenseCommand(
+        "delete",
+        target
+    );
+
+    return {
+        success: true,
+        simulated: false,
+        action: "UNBLOCK_IP",
+        target,
+        firewall: "pfSense",
+        table: BLOCK_TABLE,
+        output: result.stdout,
+        message:
+            `IP ${target} removed from ${BLOCK_TABLE}`
+    };
 }
 
 
@@ -95,39 +181,32 @@ async function executeResponse(action, target) {
         ) {
 
             case "BLOCK_IP":
-
                 return await blockIP(target);
 
+            case "UNBLOCK_IP":
+                return await unblockIP(target);
+
+
+            // Keep these simulated until their
+            // integrations are implemented safely.
 
             case "ISOLATE_HOST":
 
-                console.log(
-                    `RESPONSE EXECUTOR: ISOLATE_HOST requested for ${target}`
-                );
-
                 return {
-
                     success: true,
                     simulated: true,
                     action: "ISOLATE_HOST",
                     target
-
                 };
 
 
             case "DISABLE_ACCOUNT":
 
-                console.log(
-                    `RESPONSE EXECUTOR: DISABLE_ACCOUNT requested for ${target}`
-                );
-
                 return {
-
                     success: true,
                     simulated: true,
                     action: "DISABLE_ACCOUNT",
                     target
-
                 };
 
 
@@ -136,11 +215,9 @@ async function executeResponse(action, target) {
                 throw new Error(
                     `Unsupported response action: ${action}`
                 );
-
         }
 
-    }
-    catch (error) {
+    } catch (error) {
 
         console.error(
             "RESPONSE EXECUTION FAILED:",
@@ -148,21 +225,13 @@ async function executeResponse(action, target) {
         );
 
         return {
-
             success: false,
-
-            simulated: true,
-
+            simulated: false,
             action,
-
             target,
-
             error: error.message
-
         };
-
     }
-
 }
 
 
