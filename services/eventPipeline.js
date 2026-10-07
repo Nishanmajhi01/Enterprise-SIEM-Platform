@@ -21,7 +21,6 @@
 // ============================================================
 // MODELS
 // ============================================================
-
 const SecurityEvent =
 require("../models/SecurityEvent");
 
@@ -38,7 +37,9 @@ require("../detection/bruteForce");
 
 const detectPortScan =
 require("../detection/portScan");
-
+const {
+    detectMalwareV2
+} = require("../detection/malwareV2");
 
 // ============================================================
 // SERVICES
@@ -452,6 +453,134 @@ async function processSecurityEvent(eventData) {
                 );
 
             }
+
+        }
+
+        /*
+        ========================================================
+        STEP 7.5 - MALWARE V2 DETECTION
+        ========================================================
+        */
+
+        let malwareResult = {
+
+            detected: false,
+
+            hashes: [],
+
+            results: [],
+
+            reason: "NOT_CHECKED"
+
+        };
+
+
+        try {
+
+            malwareResult =
+                await detectMalwareV2(
+                    securityEvent
+                );
+
+
+            if (malwareResult.detected) {
+
+                securityEvent.attackType =
+                    "MALWARE";
+
+                securityEvent.severity =
+                    malwareResult.severity ||
+                    "CRITICAL";
+
+
+                const existingRaw =
+                    securityEvent.raw || {};
+
+
+                securityEvent.raw = {
+
+                    ...existingRaw,
+
+                    detection: {
+
+                        ...(existingRaw.detection || {}),
+
+                        malware: {
+
+                            detected: true,
+
+                            maliciousHash:
+                                malwareResult.maliciousHash,
+
+                            maliciousDetections:
+                                malwareResult.maliciousDetections,
+
+                            hashes:
+                                malwareResult.hashes,
+
+                            virusTotal:
+                                malwareResult.results,
+
+                            detectedAt:
+                                malwareResult.detectedAt
+
+                        }
+
+                    }
+
+                };
+
+
+                securityEvent.changed(
+                    "raw",
+                    true
+                );
+
+
+                await securityEvent.save();
+
+
+                console.log(
+                    "\n=========================================="
+                );
+
+                console.log(
+                    "MALWARE DETECTED"
+                );
+
+                console.log(
+                    "Event ID:",
+                    securityEvent.id
+                );
+
+                console.log(
+                    "Hash:",
+                    malwareResult.maliciousHash
+                );
+
+                console.log(
+                    "VirusTotal malicious detections:",
+                    malwareResult.maliciousDetections
+                );
+
+                console.log(
+                    "==========================================\n"
+                );
+
+            }
+
+        }
+        catch (error) {
+
+            /*
+             * Malware reputation failure must not stop
+             * normal security-event ingestion.
+             */
+
+            console.log(
+                "Malware V2 detector error:",
+                error.message
+            );
 
         }
 
