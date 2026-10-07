@@ -592,10 +592,18 @@ async function processSecurityEvent(eventData) {
         const detection = {
 
             riskScore:
-                ruleResult.totalRisk,
+                ruleResult.totalRisk +
+                (
+                    malwareResult.detected
+                        ? Number(malwareResult.riskScore || 70)
+                        : 0
+                ),
 
             alerts:
-                ruleResult.alerts
+                ruleResult.alerts,
+
+            malware:
+                malwareResult
 
         };
 
