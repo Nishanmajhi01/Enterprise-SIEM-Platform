@@ -37,6 +37,8 @@ require("../detection/bruteForce");
 
 const detectPortScan =
 require("../detection/portScan");
+const { detectDDoSV2 } =
+require("../detection/ddosV2");
 const {
     detectMalwareV2
 } = require("../detection/malwareV2");
@@ -86,6 +88,8 @@ const INCIDENT_RISK_THRESHOLD = 70;
 // ============================================================
 // MAIN EVENT PIPELINE
 // ============================================================
+
+const { createDDoSIncident } = require("./ddosIncidentService");
 
 async function processSecurityEvent(eventData) {
 
@@ -456,6 +460,61 @@ async function processSecurityEvent(eventData) {
 
         }
 
+/*
+ ========================================================
+ STEP 7.4 - DDOS V2 LIVE MONITORING
+ ========================================================
+*/
+
+try {
+
+    if (securityEvent.eventType === "PFSENSE_FIREWALL") {
+
+
+const ddosResult = detectDDoSV2(securityEvent);
+
+        if (ddosResult.shouldAlert) {
+
+            console.log(
+                "\n========== DDOS V2 DETECTED =========="
+            );
+
+            console.log(
+                JSON.stringify(ddosResult, null, 2)
+            );
+
+            const ddosIncident =
+                await createDDoSIncident(ddosResult);
+
+            if (ddosIncident) {
+                console.log(
+                    "DDOS V2 INCIDENT:",
+                    ddosIncident.id,
+                    "| Status:",
+                    ddosIncident.status
+                );
+            }
+
+            console.log(
+                "MODE: INCIDENT MONITORING - NO AUTO BLOCKING"
+            );
+
+            console.log(
+                "======================================\n"
+            );
+
+        }
+
+    }
+
+} catch (error) {
+
+    console.log(
+        "DDoS V2 monitoring error:",
+        error.message
+    );
+
+}
         /*
         ========================================================
         STEP 7.5 - MALWARE V2 DETECTION

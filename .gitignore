@@ -4,3 +4,12 @@ logs/
 *.log
 coverage/
 .DS_Store
+# Temporary backups
+*.bak
+*.bak-*
+
+# Additional secrets and local configuration
+.env.*
+!.env.example
+*.pem
+*.key

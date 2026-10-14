@@ -14,7 +14,23 @@ const {
 // ========================================================
 
 const executePlaybook = async (incident) => {
+        // =================================================
+        // DDOS V2 SAFETY GUARD
+        // Monitoring and incident creation only.
+        // Never execute automatic response actions for DDOS.
+        // =================================================
 
+        if (
+            String(incident.attackType || "")
+                .trim()
+                .toUpperCase() === "DDOS"
+        ) {
+            console.log(
+                `DDOS SAFETY: Automatic response disabled for incident ${incident.id}`
+            );
+
+            return null;
+        }
     try {
 
         // =================================================

@@ -64,12 +64,18 @@ break;
 
 
 
-case "ddos":
+case "ddos": {
+  const mode = req.body?.mode ?? "single";
 
-events=simulateDDoS();
+  if (!["single", "distributed"].includes(mode)) {
+    return res.status(400).json({
+      message: "Invalid DDoS mode. Use single or distributed."
+    });
+  }
 
-break;
-
+  events = simulateDDoS(mode);
+  break;
+}
 
 
 default:
