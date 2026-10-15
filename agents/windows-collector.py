@@ -28,13 +28,13 @@ def parse_event(line):
     # Match the target account, not the subject (which may be SYSTEM).
     target_section = line.split("Account For Which Logon Failed:", 1)
     target = target_section[1].split("Failure Information:", 1)[0] if len(target_section) > 1 else ""
-    match = re.search(r"Account Name:(?:#011|\\s)+([^#\\s]+)", target)
+    match = re.search(r"Account Name:(?:#011|\s)+([^#\s]+)", target)
     username = match.group(1) if match else "UNKNOWN"
 
     # The attacker address may be absent for local/interactive failed logons.
     # Never attribute those attempts to the Windows target's own IP.
     address_match = re.search(
-        r"Source Network Address:(?:#011|\\s)+([^#\\s]+)", line, re.IGNORECASE
+        r"Source Network Address:(?:#011|\s)+([^#\s]+)", line, re.IGNORECASE
     )
     source_ip = "UNKNOWN"
     if address_match:
