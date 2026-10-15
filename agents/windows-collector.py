@@ -18,17 +18,7 @@ SIEM_URL = os.environ.get("SIEM_INGEST_URL", "http://127.0.0.1:5000/api/ingest")
 POLL_SECONDS = 0.5
 
 # NXLog's rsyslog output escapes tabs as #011.
-FIELD_SEPARATOR = r"(?:#011|\\t|\\s)+"
 EVENT_MESSAGE = "An account failed to log on."
-
-
-def field(text, name):
-    match = re.search(
-        re.escape(name) + r":" + FIELD_SEPARATOR + r"([^#\\r\\n]+?)(?=(?:\\s{2,}[A-Z][^:]{1,45}:)|$)",
-        text,
-        re.IGNORECASE,
-    )
-    return match.group(1).strip() if match else None
 
 
 def parse_event(line):
