@@ -97,9 +97,11 @@ const executePlaybook = async (incident) => {
                 incident.sourceIP,
 
             status:
-                result.success
-                    ? "SUCCESS"
-                    : "FAILED",
+                !result.success
+                    ? "FAILED"
+                    : result.simulated
+                        ? "SIMULATED"
+                        : "SUCCESS",
 
             details: {
 
@@ -124,7 +126,7 @@ const executePlaybook = async (incident) => {
         // UPDATE INCIDENT
         // =================================================
 
-        if (result.success) {
+        if (result.success && !result.simulated) {
 
             incident.status =
                 "CONTAINED";
@@ -139,9 +141,11 @@ const executePlaybook = async (incident) => {
             {
 
                 action:
-                    result.success
-                        ? "PLAYBOOK_EXECUTED"
-                        : "PLAYBOOK_FAILED",
+                    !result.success
+                        ? "PLAYBOOK_FAILED"
+                        : result.simulated
+                            ? "PLAYBOOK_SIMULATED"
+                            : "PLAYBOOK_EXECUTED",
 
                 responseAction:
                     playbook.action,
