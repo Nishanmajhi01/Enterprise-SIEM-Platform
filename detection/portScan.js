@@ -41,6 +41,11 @@
 const CONFIG = {
 
     /*
+     * Authorized lab subnet for horizontal scan detection.
+     */
+    MONITORED_SUBNET_PREFIX: "192.168.1.",
+
+    /*
      * Number of milliseconds during which packets
      * belong to the same potential scan.
      */
@@ -1331,6 +1336,10 @@ function detectPortScan(event) {
         !ignoredServicePort &&
 
         internalDestination &&
+
+        destinationIP.startsWith(
+            CONFIG.MONITORED_SUBNET_PREFIX
+        ) &&
 
         !broadcastOrMulticast;
 

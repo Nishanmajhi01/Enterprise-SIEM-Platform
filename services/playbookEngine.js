@@ -86,6 +86,25 @@ const executePlaybook = async (incident) => {
         // EXECUTE RESPONSE
         // =================================================
 
+        // Prevent repeated successful responses for the same incident.
+        if (playbook.action === "BLOCK_IP") {
+            const previousBlock = await ResponseAction.findOne({
+                where: {
+                    incidentId: incident.id,
+                    action: "BLOCK_IP",
+                    target: incident.sourceIP,
+                    status: "SUCCESS"
+                }
+            });
+
+            if (previousBlock) {
+                console.log(
+                    `BLOCK_IP SKIPPED: Incident ${incident.id} already has successful response ${previousBlock.id}`
+                );
+                return null;
+            }
+        }
+
         const result =
         await executeResponse(
 

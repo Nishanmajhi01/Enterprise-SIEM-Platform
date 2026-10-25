@@ -7,6 +7,24 @@ const ResponsePlaybook = require("../models/ResponsePlaybook");
 const baselinePlaybooks = [
 
     {
+        name: "Port Scan Response (High)",
+        triggerType: "PORT_SCAN",
+        severity: "HIGH",
+        action: "BLOCK_IP",
+        enabled: false
+    },
+
+    {
+        name: "Port Scan Response (Critical)",
+        triggerType: "PORT_SCAN",
+        severity: "CRITICAL",
+        action: "BLOCK_IP",
+        enabled: false
+    },
+
+
+
+    {
         name: "Block Brute Force Source IP",
         triggerType: "BRUTE_FORCE",
         severity: "HIGH",
@@ -43,7 +61,7 @@ const baselinePlaybooks = [
         triggerType: "DDOS",
         severity: "HIGH",
         action: "BLOCK_IP",
-        enabled: true
+        enabled: false
     },
 
     {

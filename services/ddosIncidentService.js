@@ -13,9 +13,10 @@
 
 const Incident = require("../models/Incident");
 const Evidence = require("../models/Evidence");
+const Alert = require("../models/Alert");
 const { sequelize } = require("../config/database");
 const { Op } = require("sequelize");
-const { emitIncident } = require("../utils/socketEmitter");
+const { emitIncident, emitAlert } = require("../utils/socketEmitter");
 
 const CORRELATION_WINDOW_MS = 10 * 60 * 1000;
 
@@ -209,6 +210,22 @@ async function createDDoSIncident(result, options = {}) {
 
         }, { transaction });
 
+        // Create an alert linked to this incident.
+        // Do not call createSecurityAlert(), which could
+        // create a duplicate incident.
+        const alert = await Alert.create({
+            title: incident.title,
+            description: incident.description,
+            severity,
+            sourceIP: result.sourceIP || null,
+            attackType: "DDOS",
+            riskScore,
+            status: "NEW",
+            incidentId: incident.id,
+            mitreTechnique: "T1498",
+            tactic: "Impact"
+        }, { transaction });
+
         // Only notify after a successful commit.
         // External transactions must be committed by the caller.
         if (ownsTransaction) {
@@ -216,6 +233,7 @@ async function createDDoSIncident(result, options = {}) {
 
             try {
                 emitIncident(incident);
+                emitAlert(alert);
             } catch (notificationError) {
                 console.error(
                     "DDOS V2 dashboard notification failed:",

@@ -1,3 +1,4 @@
+const net = require("node:net");
 const {
     createSecurityAlert
 } = require("../services/alertService");
@@ -39,7 +40,13 @@ async function detectBruteForce(event) {
 
     const ip = event.sourceIP;
 
-    if (!ip) {
+    if (
+        !ip ||
+        net.isIP(ip) === 0 ||
+        ip === "::1" ||
+        ip.startsWith("127.") ||
+        ip.toLowerCase().startsWith("::ffff:127.")
+    ) {
         return null;
     }
 

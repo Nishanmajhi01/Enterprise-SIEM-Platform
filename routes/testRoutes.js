@@ -12,7 +12,7 @@ const event = {
 
 sourceIP:"192.168.1.100",
 
-attackType:"BRUTE_FORCE"
+attackType:"FAILED_LOGIN"
 
 };
 
