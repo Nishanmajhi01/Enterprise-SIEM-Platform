@@ -4,6 +4,8 @@ require("../models/ResponsePlaybook");
 const ResponseAction =
 require("../models/ResponseAction");
 
+const { withIncidentLock } = require("./responseLock");
+
 const {
     executeResponse
 } = require("./responseExecutor");
@@ -13,7 +15,7 @@ const {
 // EXECUTE INCIDENT RESPONSE PLAYBOOK
 // ========================================================
 
-const executePlaybook = async (incident) => {
+const executePlaybookUnlocked = async (incident) => {
         // =================================================
         // DDOS V2 SAFETY GUARD
         // Monitoring and incident creation only.
@@ -245,6 +247,19 @@ const executePlaybook = async (incident) => {
 
 };
 
+
+const executePlaybook = async (incident) => {
+    if (
+        String(incident.attackType || "").trim().toUpperCase() === "BRUTE_FORCE"
+    ) {
+        return withIncidentLock(
+            incident.id,
+            () => executePlaybookUnlocked(incident)
+        );
+    }
+
+    return executePlaybookUnlocked(incident);
+};
 
 module.exports = {
     executePlaybook
