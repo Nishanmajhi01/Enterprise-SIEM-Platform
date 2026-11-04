@@ -9,84 +9,110 @@ require("../utils/auditLogger");
 
 
 
-exports.register=async(req,res)=>{
+exports.register = async (req, res) => {
+    try {
+        const {
+            username,
+            email,
+            password,
+            role = "VIEWER"
+        } = req.body || {};
 
+        if (
+            typeof username !== "string" ||
+            username.trim().length < 3 ||
+            username.trim().length > 100
+        ) {
+            return res.status(400).json({
+                message: "Username must contain 3 to 100 characters"
+            });
+        }
 
-try{
+        if (
+            typeof email !== "string" ||
+            email.length > 254 ||
+            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+        ) {
+            return res.status(400).json({
+                message: "Invalid email address"
+            });
+        }
 
+        if (
+            typeof password !== "string" ||
+            password.length < 12 ||
+            password.length > 72
+        ) {
+            return res.status(400).json({
+                message: "Password must contain 12 to 72 characters"
+            });
+        }
 
-const {
-username,
-email,
-password
-}=req.body;
+        if (
+            typeof role !== "string" ||
+            !["ADMIN", "ANALYST", "VIEWER"].includes(role)
+        ) {
+            return res.status(400).json({
+                message: "Invalid user role"
+            });
+        }
 
+        const normalizedEmail = email.trim().toLowerCase();
 
+        const existingUser = await User.findOne({
+            where: { email: normalizedEmail }
+        });
 
-const hashedPassword=
-await bcrypt.hash(password,10);
+        if (existingUser) {
+            return res.status(409).json({
+                message: "Email already registered"
+            });
+        }
 
+        const hashedPassword = await bcrypt.hash(password, 10);
 
+        const user = await User.create({
+            username: username.trim(),
+            email: normalizedEmail,
+            password: hashedPassword,
+            role
+        });
 
-const user=
-await User.create({
+        await createAuditLog({
+            username: req.user.username,
+            action: "USER_REGISTER",
+            module: "AUTH",
+            severity: "MEDIUM",
+            ipAddress: req.ip,
+            description:
+                `Administrator created account ${user.username} with role ${role}`
+        });
 
-username,
+        return res.status(201).json({
+            success: true,
+            message: "User created successfully",
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role
+            }
+        });
 
-email,
+    } catch (error) {
+        console.error("User registration failed:", error);
 
-password:hashedPassword
+        if (error.name === "SequelizeUniqueConstraintError") {
+            return res.status(409).json({
+                message: "Email already registered"
+            });
+        }
 
-});
-
-await createAuditLog({
-
-username,
-
-action:"USER_REGISTER",
-
-module:"AUTH",
-
-severity:"LOW",
-
-ipAddress:req.ip,
-
-description:
-"New user registered in SIEM platform"
-
-});
-
-
-
-res.json({
-
-message:"User Created",
-
-user
-
-});
-
-
-
-}catch(error){
-
-
-res.status(500)
-.json({
-
-error:error.message
-
-});
-
-
-}
-
-
-
+        return res.status(500).json({
+            message: "Unable to register user"
+        });
+    }
 };
-
-
-
 
 
 exports.login=async(req,res)=>{

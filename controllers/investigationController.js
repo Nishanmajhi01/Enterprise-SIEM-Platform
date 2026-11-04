@@ -34,6 +34,25 @@ message:"Incident not found"
 
 
 
+// SECURITY: Validate investigation notes and protect closed incidents.
+if (incident.status === "CLOSED") {
+    return res.status(409).json({
+        message: "Closed incidents cannot be modified"
+    });
+}
+
+const description = req.body?.description;
+
+if (
+    typeof description !== "string" ||
+    !description.trim() ||
+    description.length > 5000
+) {
+    return res.status(400).json({
+        message: "Investigation description must contain 1-5000 characters"
+    });
+}
+
 const investigation =
 await Investigation.create({
 
@@ -50,7 +69,7 @@ action:
 
 
 description:
-req.body.description,
+description.trim(),
 
 
 result:
@@ -63,7 +82,7 @@ req.body.result || null
 
 
 
-incident.status="INVESTIGATING";
+// Preserve the current incident lifecycle status.
 
 
 
@@ -83,7 +102,7 @@ req.user.username,
 
 
 description:
-req.body.description,
+description.trim(),
 
 
 time:new Date()

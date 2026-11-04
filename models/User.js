@@ -36,7 +36,7 @@ allowNull:false
 
 role:{
 type:DataTypes.STRING,
-defaultValue:"ANALYST"
+defaultValue:"VIEWER"
 }
 
 },

@@ -192,6 +192,8 @@ resolveIncident
 
 router.post(
 "/:id/comments",
+authenticate,
+rbac(["ADMIN", "ANALYST"]),
 commentController.addComment
 );
 
@@ -239,5 +241,14 @@ acknowledgeIncident
 
 
 
+
+
+// MANUAL CONTAINMENT - ANALYST-REPORTED VERIFICATION
+router.patch(
+    "/:id/manual-contain",
+    authenticate,
+    rbac(["ADMIN", "ANALYST"]),
+    require("../controllers/incidentController").manualContainIncident
+);
 
 module.exports = router;

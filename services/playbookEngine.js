@@ -161,7 +161,9 @@ const executePlaybookUnlocked = async (incident) => {
         // UPDATE INCIDENT
         // =================================================
 
-        if (result.success) {
+        // Only real successful responses establish containment.
+        // Simulated actions must not imply real containment.
+        if (result.success && result.simulated !== true) {
 
             incident.status =
                 "CONTAINED";

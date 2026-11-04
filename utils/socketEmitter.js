@@ -76,7 +76,25 @@ exports.emitAlert = (alert)=>{
 
 
             createdAt:
-            alert.createdAt
+            alert.createdAt,
+
+            destinationIP:
+            alert.destinationIP,
+
+            incidentId:
+            alert.incidentId,
+
+            mitreTechnique:
+            alert.mitreTechnique,
+
+            tactic:
+            alert.tactic,
+
+            detection:
+            alert.detection,
+
+            scanType:
+            alert.detection?.scanType ?? alert.scanType
 
 
         }

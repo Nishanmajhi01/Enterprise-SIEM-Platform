@@ -139,9 +139,7 @@ const startServer = async () => {
 
         // Connect DB
         await connectDatabase();
-        await sequelize.sync({
-    alter:true
-});
+        // Database schema changes must be handled through migrations.
 
         logger.info("Database Connected Successfully");
 

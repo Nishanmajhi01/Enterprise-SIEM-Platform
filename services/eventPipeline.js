@@ -24,6 +24,8 @@
 const SecurityEvent =
 require("../models/SecurityEvent");
 
+const Alert = require("../models/Alert");
+
 const IOCMatch =
 require("../models/IOCMatch");
 
@@ -42,6 +44,9 @@ require("../detection/ddosV2");
 const {
     detectMalwareV2
 } = require("../detection/malwareV2");
+
+const { detectPhishingV2 } =
+require("../detection/phishingV2");
 
 // ============================================================
 // SERVICES
@@ -644,6 +649,48 @@ const ddosResult = detectDDoSV2(securityEvent);
         }
 
 
+        // PHISHING V2 DETECTION
+        let phishingResult = { detected: false };
+
+        try {
+            phishingResult =
+                await detectPhishingV2(securityEvent);
+
+            if (
+                phishingResult.detected &&
+                !malwareResult.detected &&
+                securityEvent.attackType !== "PORT_SCAN" &&
+                securityEvent.attackType !== "DDOS"
+            ) {
+                securityEvent.attackType = "PHISHING";
+                securityEvent.severity =
+                    phishingResult.severity;
+
+                const existingRaw = securityEvent.raw || {};
+
+                securityEvent.raw = {
+                    ...existingRaw,
+                    detection: {
+                        ...(existingRaw.detection || {}),
+                        phishing: phishingResult
+                    }
+                };
+
+                securityEvent.changed("raw", true);
+                await securityEvent.save();
+
+                console.log(
+                    "PHISHING V2 DETECTED:",
+                    securityEvent.id
+                );
+            }
+        } catch (error) {
+            console.error(
+                "Phishing V2 error:",
+                error.message
+            );
+        }
+
         /*
         ========================================================
         STEP 8 - BUILD DETECTION RULE CONTEXT
@@ -784,6 +831,12 @@ const ddosResult = detectDDoSV2(securityEvent);
                 (
                     malwareResult.detected
                         ? Number(malwareResult.riskScore || 70)
+                        : 0
+                ) +
+                (
+                    phishingResult.detected &&
+                    securityEvent.attackType === "PHISHING"
+                        ? Number(phishingResult.riskScore || 0)
                         : 0
                 ),
 
@@ -1057,11 +1110,21 @@ const ddosResult = detectDDoSV2(securityEvent);
         */
 
         let incident = null;
+        let persistedPortScanAlert = null;
+        let persistedMalwareAlert = null;
+        let persistedPhishingAlert = null;
 
 
+        // Respect the detector cooldown for port scans.
+        // Only process a port-scan incident when the detector
+        // explicitly permits an alert. Other attack types retain
+        // the existing risk-threshold behavior.
         if (
-            risk.score >=
-            INCIDENT_RISK_THRESHOLD
+            risk.score >= INCIDENT_RISK_THRESHOLD &&
+            (
+                securityEvent.attackType !== "PORT_SCAN" ||
+                portScanResult.shouldAlert
+            )
         ) {
 
             try {
@@ -1092,8 +1155,104 @@ const ddosResult = detectDDoSV2(securityEvent);
                 // CREATE OR CORRELATE INCIDENT
                 // =============================================
 
+                // Persist a real Alert for port-scan detections.
+                // Do not call createSecurityAlert here: it also creates
+                // incidents and emits notifications.
+
+
+                if (securityEvent.attackType === "PORT_SCAN") {
+                    try {
+                        persistedPortScanAlert = await Alert.create({
+                            title: buildAlertTitle(
+                                securityEvent,
+                                portScanResult
+                            ),
+                            description:
+                                buildIncidentDescription(
+                                    securityEvent,
+                                    portScanResult
+                                ) || securityEvent.message || null,
+                            severity: risk.level,
+                            status: "NEW",
+                            sourceIP: securityEvent.sourceIP || null,
+                            attackType: "PORT_SCAN",
+                            riskScore: risk.score,
+                            mitreTechnique: mitre?.technique || null,
+                            tactic: mitre?.tactic || null
+                        });
+
+                        console.log(
+                            "PORT-SCAN ALERT PERSISTED:",
+                            persistedPortScanAlert.id
+                        );
+                    } catch (alertError) {
+                        console.error(
+                            "Port-scan alert persistence failed:",
+                            alertError.message
+                        );
+                        // Do not create an incident without its Alert record.
+                        throw alertError;
+                    }
+                }
+
+                // Persist Malware V2 Alert before incident creation.
+                if (
+                    securityEvent.attackType === "MALWARE" &&
+                    malwareResult.detected
+                ) {
+                    persistedMalwareAlert = await Alert.create({
+                        title: "Malware Detected - Malicious File Hash",
+                        description:
+                            `VirusTotal detected ${malwareResult.maliciousDetections} malicious results for hash ${malwareResult.maliciousHash}`,
+                        severity: risk.level,
+                        status: "NEW",
+                        sourceIP: securityEvent.sourceIP || null,
+                        attackType: "MALWARE",
+                        riskScore: risk.score,
+                        mitreTechnique:
+                            malwareResult.mitre?.technique || "T1204",
+                        tactic:
+                            malwareResult.mitre?.tactic || "Execution"
+                    });
+
+                    console.log(
+                        "MALWARE ALERT PERSISTED:",
+                        persistedMalwareAlert.id
+                    );
+                }
+
+                // Persist Phishing V2 Alert
+                if (
+                    securityEvent.attackType === "PHISHING" &&
+                    phishingResult.detected
+                ) {
+                    persistedPhishingAlert = await Alert.create({
+                        title: "Phishing URL Detected",
+                        description:
+                            `Suspicious URL: ${phishingResult.suspiciousURL}; Indicators: ${phishingResult.indicators.join(", ")}`,
+                        severity: risk.level,
+                        status: "NEW",
+                        sourceIP: securityEvent.sourceIP || null,
+                        attackType: "PHISHING",
+                        riskScore: risk.score,
+                        mitreTechnique: "T1566",
+                        tactic: "Initial Access"
+                    });
+
+                    console.log(
+                        "PHISHING ALERT PERSISTED:",
+                        persistedPhishingAlert.id
+                    );
+                }
+
                 incident =
                     await createIncidentFromAlert({
+
+                        id:
+                            persistedPortScanAlert?.id || persistedMalwareAlert?.id || persistedPhishingAlert?.id || undefined,
+
+                        alertInstance:
+                            persistedPortScanAlert || persistedMalwareAlert || persistedPhishingAlert || undefined,
 
                         title:
                             buildIncidentTitle(
@@ -1224,10 +1383,16 @@ const ddosResult = detectDDoSV2(securityEvent);
 
         try {
 
+            const suppressPortScanNotification =
+                portScanResult.detected &&
+                !portScanResult.shouldAlert;
+
+            if (!suppressPortScanNotification) {
+
             emitAlert({
 
                 id:
-                    securityEvent.id,
+                    persistedPortScanAlert?.id || securityEvent.id,
 
                 title:
                     buildAlertTitle(
@@ -1255,6 +1420,12 @@ const ddosResult = detectDDoSV2(securityEvent);
 
                 riskScore:
                     securityEvent.riskScore,
+
+                mitreTechnique:
+                    mitre?.technique,
+
+                tactic:
+                    mitre?.tactic,
 
                 incidentId:
                     securityEvent.incidentId,
@@ -1285,6 +1456,8 @@ const ddosResult = detectDDoSV2(securityEvent);
                     securityEvent.createdAt
 
             });
+
+            }
 
         }
         catch (error) {

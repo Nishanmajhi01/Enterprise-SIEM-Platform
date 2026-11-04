@@ -39,16 +39,7 @@ console.log(
 
 
 
-await sequelize.sync({
 
-alter:true
-
-});
-
-
-console.log(
-"Database Tables Updated"
-);
 
 
 
@@ -57,13 +48,8 @@ console.log(
 catch(error){
 
 
-console.log(
-
-"Database Connection Failed",
-
-error
-
-);
+console.error("Database Connection Failed", error);
+throw error;
 
 
 }

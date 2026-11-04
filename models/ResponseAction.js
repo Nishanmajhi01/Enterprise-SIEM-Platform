@@ -39,7 +39,7 @@ allowNull:true
 
 status:{
 type:DataTypes.STRING,
-defaultValue:"SUCCESS"
+defaultValue:"PENDING"
 },
 
 
