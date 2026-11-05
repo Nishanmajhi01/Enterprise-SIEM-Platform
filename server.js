@@ -48,6 +48,7 @@ const logger = require("./utils/logger");
  */
 const authRoutes = require("./routes/authRoutes");
 const publicSignupRoutes = require("./routes/publicSignupRoutes");
+const emailAccountRoutes = require("./routes/emailAccountRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const alertRoutes = require("./routes/alertRoutes");
 const threatRoutes = require("./routes/threatRoutes");
@@ -91,6 +92,7 @@ app.use((req, res, next) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/public-signup", publicSignupRoutes);
+app.use("/api/email-account", emailAccountRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/threat", threatRoutes);
