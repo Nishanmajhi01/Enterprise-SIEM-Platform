@@ -113,6 +113,96 @@ router.get(
 );
 
 /*
+ * Workspace administrator: create an account in this workspace atomically.
+ * Platform role is VIEWER; permissions come from verified workspace membership.
+ * Existing emails must use a separate invitation workflow (not implemented).
+ */
+router.post(
+    "/workspace-members",
+    authenticate,
+    require("../middleware/workspaceAuth"),
+    require("../middleware/workspaceRbac")("ADMIN"),
+    async (req, res) => {
+        const bcrypt = require("bcrypt");
+        const { randomUUID } = require("crypto");
+        const { sequelize } = require("../config/database");
+        const User = require("../models/User");
+        const WorkspaceMembership = require("../models/WorkspaceMembership");
+        const { username, email, password, role = "VIEWER" } = req.body || {};
+
+        if (typeof username !== "string" || username.trim().length < 3 ||
+            username.trim().length > 100 ||
+            typeof email !== "string" || email.length > 254 ||
+            !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.trim()) ||
+            typeof password !== "string" || password.length < 12 ||
+            password.length > 72 ||
+            !["ADMIN", "ANALYST", "VIEWER"].includes(role)) {
+            return res.status(400).json({
+                message: "Valid username (3-100), email, password (12-72) and workspace role required"
+            });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+        try {
+            const passwordHash = await bcrypt.hash(password, 10);
+            const result = await sequelize.transaction(async transaction => {
+                const existing = await User.findOne({
+                    where: { email: normalizedEmail }, transaction
+                });
+                if (existing) {
+                    const conflict = new Error("Email already registered");
+                    conflict.statusCode = 409;
+                    throw conflict;
+                }
+                const user = await User.create({
+                    username: username.trim(),
+                    email: normalizedEmail,
+                    password: passwordHash,
+                    role: "VIEWER"
+                }, { transaction });
+                await WorkspaceMembership.create({
+                    id: randomUUID(),
+                    userId: user.id,
+                    workspaceId: req.workspaceId,
+                    role,
+                    status: "ACTIVE"
+                }, { transaction });
+                return user;
+            });
+
+            // Audit is best effort after commit, not a reason to report failure
+            // for an already-created account.
+            try {
+                await require("../utils/platformAuditLogger")({
+                    username: req.user.username,
+                    action: "USER_REGISTER",
+                    module: "AUTH",
+                    severity: "MEDIUM",
+                    ipAddress: req.ip,
+                    description: `Workspace administrator created account ${result.id} in workspace ${req.workspaceId} with membership role ${role}`
+                });
+            } catch (auditError) {
+                console.error("Workspace member creation audit failed:", auditError);
+            }
+
+            return res.status(201).json({
+                success: true,
+                user: { id: result.id, username: result.username, email: result.email },
+                workspaceId: req.workspaceId,
+                role
+            });
+        } catch (error) {
+            if (error.statusCode === 409 ||
+                error.name === "SequelizeUniqueConstraintError") {
+                return res.status(409).json({ message: "Email already registered" });
+            }
+            console.error("Workspace member creation failed:", error);
+            return res.status(500).json({ message: "Unable to create workspace member" });
+        }
+    }
+);
+
+/*
  * Login remains publicly accessible.
  */
 router.post(
