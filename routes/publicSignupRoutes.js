@@ -8,6 +8,9 @@ const User = require("../models/User");
 const Workspace = require("../models/Workspace");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
 const generateToken = require("../utils/jwt");
+const { issue } = require("../services/emailActionTokens");
+const { configured, sendVerificationEmail } = require("../services/resendEmailService");
+const requireVerification = () => process.env.REQUIRE_SIGNUP_EMAIL_VERIFICATION === "true";
 
 const router = express.Router();
 const signupLimiter = rateLimit({
@@ -32,6 +35,10 @@ router.post("/", signupLimiter, async (req, res) => {
     return res.status(400).json({ message: "Provide a valid name, email, password (12 characters minimum, maximum 72 UTF-8 bytes), and account type. Organizations require a name." });
   }
 
+  if (requireVerification() && !configured()) {
+    return res.status(503).json({ message: "Email registration is temporarily unavailable" });
+  }
+
   try {
     const hash = await bcrypt.hash(password, 12);
     const result = await sequelize.transaction(async (transaction) => {
@@ -43,7 +50,8 @@ router.post("/", signupLimiter, async (req, res) => {
       }
       // Public signups never receive platform-wide ADMIN permissions.
       const user = await User.create({
-        username: name, email: mail, password: hash, role: "VIEWER"
+        username: name, email: mail, password: hash, role: "VIEWER",
+        emailVerifiedAt: requireVerification() ? null : new Date()
       }, { transaction });
       const workspaceId = randomUUID();
       const workspace = await Workspace.create({
@@ -60,8 +68,22 @@ router.post("/", signupLimiter, async (req, res) => {
         role: "ADMIN",
         status: "ACTIVE"
       }, { transaction });
+      if (requireVerification()) {
+        const verificationToken = await issue({
+          purpose: "VERIFY_EMAIL", email: mail, userId: user.id, transaction
+        });
+        // Send before commit: delivery failure rolls back account and workspace creation.
+        // The link cannot be redeemed until the transaction commits.
+        await sendVerificationEmail({ to: mail, name, token: verificationToken });
+      }
       return { user, workspace };
     });
+    if (requireVerification()) {
+      return res.status(201).json({
+        message: "Check your email to verify your account before signing in.",
+        verificationRequired: true
+      });
+    }
     return res.status(201).json({
       message: "Workspace created",
       token: generateToken(result.user),
