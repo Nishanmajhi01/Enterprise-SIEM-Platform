@@ -105,4 +105,40 @@ router.post("/request-verification", authenticate, limit, async (req, res) => {
   }
 });
 
+
+/*
+ * Redeem a single-use email verification link.
+ * The account email must still match the address to which the link was sent.
+ * Legacy users remain usable; signup enforcement is a separate deployment step.
+ */
+router.post("/verify-email", limit, async (req, res) => {
+  const { token } = req.body || {};
+  if (typeof token !== "string" || !/^[a-f0-9]{64}$/.test(token)) {
+    return res.status(400).json({ message: "Invalid or expired verification link" });
+  }
+  try {
+    const verified = await sequelize.transaction(async transaction => {
+      const action = await consume({ token, purpose: "VERIFY_EMAIL", transaction });
+      if (!action || !action.userId) return false;
+      const user = await User.findByPk(action.userId, {
+        transaction, lock: transaction.LOCK.UPDATE
+      });
+      if (!user || user.email.trim().toLowerCase() !== action.email) return false;
+      if (!user.emailVerifiedAt) {
+        await user.update({ emailVerifiedAt: new Date() }, { transaction });
+      }
+      await EmailActionToken.update({ consumedAt: new Date() }, {
+        where: { userId: user.id, purpose: "VERIFY_EMAIL", consumedAt: null },
+        transaction
+      });
+      return true;
+    });
+    if (!verified) return res.status(400).json({ message: "Invalid or expired verification link" });
+    return res.json({ message: "Email verified successfully" });
+  } catch (error) {
+    console.error("Email verification failed:", error.message);
+    return res.status(500).json({ message: "Unable to verify email" });
+  }
+});
+
 module.exports = router;
