@@ -38,7 +38,19 @@ exports.emitAlert = (alert)=>{
 
 
 
-    io.emit(
+    const workspaceId = alert?.workspaceId;
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        console.error(
+            "Security alert emission rejected: invalid workspaceId"
+        );
+        return;
+    }
+
+    io.to(`workspace:${workspaceId}`).emit(
         "security-alert",
         {
 
@@ -128,7 +140,19 @@ exports.emitIncident = (incident)=>{
 
 
 
-    io.emit(
+    const workspaceId = incident?.workspaceId;
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        console.error(
+            "Security incident emission rejected: invalid workspaceId"
+        );
+        return;
+    }
+
+    io.to(`workspace:${workspaceId}`).emit(
         "security-incident",
         {
 

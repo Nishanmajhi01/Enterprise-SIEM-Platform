@@ -11,7 +11,18 @@ primaryKey:true
 },
 
 
-securityEventId:{
+workspaceId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+        model: "Workspaces",
+        key: "id"
+    },
+    onUpdate: "CASCADE",
+    onDelete: "RESTRICT"
+},
+
+securityEventId: {
 type:DataTypes.INTEGER,
 allowNull:false
 },

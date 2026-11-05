@@ -3,6 +3,7 @@ const Evidence = require("../models/Evidence");
 const Alert = require("../models/Alert");
 
 const { Op } = require("sequelize");
+const { sequelize } = require("../config/database");
 
 const {
     emitIncident
@@ -21,6 +22,65 @@ const INCIDENT_RISK_THRESHOLD = 70;
 
 const INCIDENT_CORRELATION_WINDOW_MS =
     10 * 60 * 1000;
+
+// ============================================================
+// WORKSPACE-SCOPED CORRELATION LOCK KEY
+// ============================================================
+
+function buildCorrelationLockKey(
+    workspaceId,
+    sourceIP,
+    attackType,
+    scanType
+) {
+    return JSON.stringify([
+        "INCIDENT_CORRELATION_V1",
+        workspaceId,
+        sourceIP ?? null,
+        attackType,
+        attackType === "PORT_SCAN"
+            ? "ALL_PORT_SCAN_TYPES"
+            : null
+    ]);
+}
+
+async function acquireCorrelationLock(transaction, lockKey) {
+    if (!transaction || transaction.finished) {
+        throw new Error(
+            "Active transaction required for correlation locking"
+        );
+    }
+
+    if (typeof lockKey !== "string" || !lockKey) {
+        throw new Error("Valid correlation lock key required");
+    }
+
+    await sequelize.query(
+        "SELECT pg_advisory_xact_lock(hashtext(:lockKey))",
+        {
+            replacements: { lockKey },
+            transaction
+        }
+    );
+}
+
+
+
+
+// ============================================================
+// ATOMIC INCIDENT TRANSACTION WRAPPER
+// ============================================================
+
+async function withIncidentTransaction(lockKey, callback) {
+    if (typeof callback !== "function") {
+        throw new Error("Transaction callback required");
+    }
+
+    return sequelize.transaction(async transaction => {
+        await acquireCorrelationLock(transaction, lockKey);
+        return callback(transaction);
+    });
+}
 
 
 // ============================================================
@@ -46,12 +106,146 @@ const VALID_SCAN_TYPES = new Set([
 
 
 // ============================================================
+// TRANSACTIONAL INCIDENT DATABASE OPERATIONS
+// ============================================================
+
+// Database-only incident operations will be moved here.
+// Do not execute response playbooks or WebSocket notifications
+// inside this transaction callback.
+async function runIncidentDatabaseOperations(transaction, callback) {
+    if (!transaction || transaction.finished) {
+        throw new Error(
+            "Active transaction required for incident operations"
+        );
+    }
+
+    if (typeof callback !== "function") {
+        throw new Error("Incident database callback required");
+    }
+
+    return callback(transaction);
+}
+
+
+// ============================================================
+// WORKSPACE-SCOPED ALERT LINKING
+// ============================================================
+
+async function getLockedAlert(
+    alertId,
+    workspaceId,
+    transaction
+) {
+    if (!transaction || transaction.finished) {
+        throw new Error(
+            "Active transaction required for alert lookup"
+        );
+    }
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        throw new Error("Valid workspace ID required");
+    }
+
+    if (!Number.isSafeInteger(alertId) || alertId <= 0) {
+        throw new Error("Valid alert ID required");
+    }
+
+    if (!transaction.LOCK || !transaction.LOCK.UPDATE) {
+        throw new Error(
+            "Transaction row locking unavailable"
+        );
+    }
+
+    const alertRecord = await Alert.findOne({
+        where: {
+            id: alertId,
+            workspaceId
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+    });
+
+    if (!alertRecord) {
+        throw new Error(
+            "Alert not found in incident workspace"
+        );
+    }
+
+    return alertRecord;
+}
+
+
+async function linkUnassignedAlert(
+    alertId,
+    incidentId,
+    workspaceId,
+    transaction
+) {
+    if (!transaction || transaction.finished) {
+        throw new Error(
+            "Active transaction required for alert linking"
+        );
+    }
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        throw new Error("Valid workspace ID required");
+    }
+
+    if (!Number.isSafeInteger(alertId) || alertId <= 0) {
+        throw new Error("Valid alert ID required");
+    }
+
+    if (!Number.isSafeInteger(incidentId) || incidentId <= 0) {
+        throw new Error("Valid incident ID required");
+    }
+
+    const [updatedCount] = await Alert.update(
+        { incidentId },
+        {
+            where: {
+                id: alertId,
+                workspaceId,
+                incidentId: null
+            },
+            transaction
+        }
+    );
+
+    if (updatedCount !== 1) {
+        throw new Error(
+            "Alert missing, already linked, or outside workspace"
+        );
+    }
+
+    return true;
+}
+
+
+// ============================================================
 // CREATE / CORRELATE INCIDENT
 // ============================================================
 
 async function createIncidentFromAlert(alert) {
 
+
     try {
+
+        const workspaceId = alert?.workspaceId;
+
+        if (
+            typeof workspaceId !== "string" ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+        ) {
+            throw new Error(
+                "Valid workspace ID required for incident creation"
+            );
+        }
 
         // ====================================================
         // NORMALISE ATTACK TYPE
@@ -170,6 +364,8 @@ async function createIncidentFromAlert(alert) {
 
         const correlationWhere = {
 
+            workspaceId,
+
             sourceIP:
                 alert.sourceIP,
 
@@ -220,6 +416,35 @@ async function createIncidentFromAlert(alert) {
         // SEARCH FOR EXISTING INCIDENT
         // ====================================================
 
+        const lockKey = buildCorrelationLockKey(
+            workspaceId,
+            alert.sourceIP,
+            attackType,
+            scanType
+        );
+
+        const result = await withIncidentTransaction(
+            lockKey,
+            async transaction => runIncidentDatabaseOperations(
+                transaction,
+                async () => {
+
+        // Lock and validate the source alert before correlation.
+        const lockedAlert = await getLockedAlert(
+            alert.id,
+            workspaceId,
+            transaction
+        );
+
+        if (
+            lockedAlert.incidentId !== null &&
+            lockedAlert.incidentId !== undefined
+        ) {
+            throw new Error(
+                "Alert is already linked to an incident"
+            );
+        }
+
         const existingIncident =
             await Incident.findOne({
 
@@ -228,7 +453,9 @@ async function createIncidentFromAlert(alert) {
 
                 order: [
                     ["updatedAt", "DESC"]
-                ]
+                ],
+
+                ...(transaction ? { transaction } : {})
 
             });
 
@@ -320,7 +547,9 @@ async function createIncidentFromAlert(alert) {
             );
 
 
-            await existingIncident.save();
+            await existingIncident.save(
+                transaction ? { transaction } : {}
+            );
 
 
             // =================================================
@@ -329,26 +558,21 @@ async function createIncidentFromAlert(alert) {
 
             if (alert.id) {
 
-                await Alert.update(
-
-                    {
-                        incidentId:
-                            existingIncident.id
-                    },
-
-                    {
-                        where: {
-                            id:
-                                alert.id
-                        }
-                    }
-
+                await linkUnassignedAlert(
+                    alert.id,
+                    existingIncident.id,
+                    workspaceId,
+                    transaction
                 );
+
 
             }
 
 
-            return existingIncident;
+            return {
+                incident: existingIncident,
+                created: false
+            };
 
         }
 
@@ -391,6 +615,8 @@ async function createIncidentFromAlert(alert) {
 
         const incident =
             await Incident.create({
+
+                workspaceId,
 
                 title:
                     incidentTitle,
@@ -507,7 +733,7 @@ async function createIncidentFromAlert(alert) {
 
                 ]
 
-            });
+            }, transaction ? { transaction } : {});
 
 
         // ====================================================
@@ -518,12 +744,12 @@ async function createIncidentFromAlert(alert) {
             alert.alertInstance
         ) {
 
-            await alert.alertInstance.update({
-
-                incidentId:
-                    incident.id
-
-            });
+            await linkUnassignedAlert(
+                alert.alertInstance.id,
+                incident.id,
+                workspaceId,
+                transaction
+            );
 
         }
 
@@ -533,6 +759,8 @@ async function createIncidentFromAlert(alert) {
         // ====================================================
 
         await Evidence.create({
+
+            workspaceId,
 
             incidentId:
                 incident.id,
@@ -581,7 +809,7 @@ async function createIncidentFromAlert(alert) {
 
             }
 
-        });
+        }, transaction ? { transaction } : {});
 
 
         // ====================================================
@@ -599,6 +827,21 @@ async function createIncidentFromAlert(alert) {
             riskScore
         );
 
+
+
+                    return {
+                        incident,
+                        created: true
+                    };
+                }
+            )
+        );
+
+        if (!result.created) {
+            return result.incident;
+        }
+
+        const incident = result.incident;
 
         // ====================================================
         // AUTOMATED RESPONSE PLAYBOOK

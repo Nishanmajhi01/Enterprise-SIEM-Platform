@@ -15,9 +15,12 @@ try{
 
 
 const incident =
-await Incident.findByPk(
-req.params.id
-);
+await Incident.findOne({
+    where: {
+        id: req.params.id,
+        workspaceId: req.workspaceId
+    }
+});
 
 
 
@@ -55,6 +58,8 @@ if (
 
 const investigation =
 await Investigation.create({
+
+workspaceId: req.workspaceId,
 
 incidentId:
 incident.id,

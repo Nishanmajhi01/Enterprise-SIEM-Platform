@@ -19,6 +19,17 @@ primaryKey:true
 
 
 
+workspaceId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+        model: "Workspaces",
+        key: "id"
+    },
+    onUpdate: "CASCADE",
+    onDelete: "RESTRICT"
+},
+
 incidentId:{
 
 type:DataTypes.INTEGER,

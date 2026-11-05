@@ -2,6 +2,11 @@ const express=require("express");
 
 const router=express.Router();
 
+const authenticate = require("../middleware/authMiddleware");
+const workspaceAuth = require("../middleware/workspaceAuth");
+
+
+
 
 const {
 createEvent
@@ -11,6 +16,8 @@ createEvent
 
 router.post(
 "/",
+authenticate,
+workspaceAuth,
 createEvent
 );
 

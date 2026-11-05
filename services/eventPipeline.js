@@ -100,6 +100,19 @@ async function processSecurityEvent(eventData) {
 
     try {
 
+        // Every event must have a trusted workspace context.
+        // HTTP controllers must derive this from authentication.
+        const workspaceId = eventData?.workspaceId;
+
+        if (
+            typeof workspaceId !== "string" ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+        ) {
+            throw new Error(
+                "Valid authenticated workspace ID required"
+            );
+        }
+
         /*
         ========================================================
         STEP 1 - NORMALISE EVENT
@@ -181,6 +194,8 @@ async function processSecurityEvent(eventData) {
             try {
 
                 await IOCMatch.create({
+
+                    workspaceId: securityEvent.workspaceId,
 
                     securityEventId:
                         securityEvent.id,
@@ -489,7 +504,9 @@ const ddosResult = detectDDoSV2(securityEvent);
             );
 
             const ddosIncident =
-                await createDDoSIncident(ddosResult);
+                await createDDoSIncident(ddosResult, {
+                    workspaceId: securityEvent.workspaceId
+                });
 
             if (ddosIncident) {
                 console.log(
@@ -1163,6 +1180,7 @@ const ddosResult = detectDDoSV2(securityEvent);
                 if (securityEvent.attackType === "PORT_SCAN") {
                     try {
                         persistedPortScanAlert = await Alert.create({
+                        workspaceId: securityEvent.workspaceId,
                             title: buildAlertTitle(
                                 securityEvent,
                                 portScanResult
@@ -1201,6 +1219,7 @@ const ddosResult = detectDDoSV2(securityEvent);
                     malwareResult.detected
                 ) {
                     persistedMalwareAlert = await Alert.create({
+                        workspaceId: securityEvent.workspaceId,
                         title: "Malware Detected - Malicious File Hash",
                         description:
                             `VirusTotal detected ${malwareResult.maliciousDetections} malicious results for hash ${malwareResult.maliciousHash}`,
@@ -1227,6 +1246,7 @@ const ddosResult = detectDDoSV2(securityEvent);
                     phishingResult.detected
                 ) {
                     persistedPhishingAlert = await Alert.create({
+                        workspaceId: securityEvent.workspaceId,
                         title: "Phishing URL Detected",
                         description:
                             `Suspicious URL: ${phishingResult.suspiciousURL}; Indicators: ${phishingResult.indicators.join(", ")}`,
@@ -1247,6 +1267,8 @@ const ddosResult = detectDDoSV2(securityEvent);
 
                 incident =
                     await createIncidentFromAlert({
+
+                        workspaceId: securityEvent.workspaceId,
 
                         id:
                             persistedPortScanAlert?.id || persistedMalwareAlert?.id || persistedPhishingAlert?.id || undefined,
@@ -1391,6 +1413,7 @@ const ddosResult = detectDDoSV2(securityEvent);
 
             emitAlert({
 
+                workspaceId: securityEvent.workspaceId,
                 id:
                     persistedPortScanAlert?.id || securityEvent.id,
 

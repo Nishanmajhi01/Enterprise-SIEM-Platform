@@ -31,7 +31,7 @@ switch(type){
 case "URL":
 
 result=
-await detectPhishing(data);
+await detectPhishing(data, req.workspaceId);
 
 break;
 
@@ -40,7 +40,7 @@ break;
 case "HASH":
 
 result=
-await detectMalware(data);
+await detectMalware(data, req.workspaceId);
 
 break;
 
@@ -49,7 +49,7 @@ break;
 case "TRAFFIC":
 
 result=
-await detectDDoS(data);
+await detectDDoS(data, req.workspaceId);
 
 break;
 

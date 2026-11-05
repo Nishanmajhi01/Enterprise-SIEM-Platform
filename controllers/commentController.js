@@ -29,7 +29,12 @@ exports.addComment = async (req, res) => {
             });
         }
 
-        const incident = await Incident.findByPk(incidentId);
+        const incident = await Incident.findOne({
+            where: {
+                id: incidentId,
+                workspaceId: req.workspaceId
+            }
+        });
 
         if (!incident) {
             return res.status(404).json({
@@ -38,6 +43,7 @@ exports.addComment = async (req, res) => {
         }
 
         const createdComment = await IncidentComment.create({
+            workspaceId: req.workspaceId,
             incidentId: incident.id,
             username: req.user.username,
             comment: comment.trim()

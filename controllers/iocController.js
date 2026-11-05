@@ -8,10 +8,12 @@ exports.createIOC = async (req, res) => {
 
         const ioc = await IOC.create({
             ...req.body,
+            workspaceId: req.workspaceId,
             createdBy: req.user.id
         });
 
         await logAction({
+            workspaceId: req.workspaceId,
             user: req.user,
             action: "IOC_CREATED",
             description: `IOC ${ioc.value} created`,
@@ -32,11 +34,28 @@ exports.updateIOC = async (req, res) => {
 
     try {
 
-        await IOC.update(req.body, {
-            where: { id: req.params.id }
+        const {
+            workspaceId,
+            createdBy,
+            id,
+            ...allowedUpdates
+        } = req.body;
+
+        const [updatedCount] = await IOC.update(allowedUpdates, {
+            where: {
+                id: req.params.id,
+                workspaceId: req.workspaceId
+            }
         });
 
+        if (updatedCount === 0) {
+            return res.status(404).json({
+                error: "IOC not found"
+            });
+        }
+
         await logAction({
+            workspaceId: req.workspaceId,
             user: req.user,
             action: "IOC_UPDATED",
             description: `IOC ${req.params.id} updated`,
@@ -54,11 +73,21 @@ exports.deleteIOC = async (req, res) => {
 
     try {
 
-        await IOC.destroy({
-            where: { id: req.params.id }
+        const deletedCount = await IOC.destroy({
+            where: {
+                id: req.params.id,
+                workspaceId: req.workspaceId
+            }
         });
 
+        if (deletedCount === 0) {
+            return res.status(404).json({
+                error: "IOC not found"
+            });
+        }
+
         await logAction({
+            workspaceId: req.workspaceId,
             user: req.user,
             action: "IOC_DELETED",
             description: `IOC ${req.params.id} deleted`,
@@ -77,6 +106,10 @@ exports.getIOCs = async (req, res) => {
     try {
 
         const iocs = await IOC.findAll({
+
+            where: {
+                workspaceId: req.workspaceId
+            },
 
             order: [
                 ["createdAt", "DESC"]
@@ -113,7 +146,9 @@ exports.searchIOCs = async (req, res) => {
 
         const { value, type } = req.query;
 
-        const where = {};
+        const where = {
+            workspaceId: req.workspaceId
+        };
 
         if (value) {
             where.value = { [Op.iLike]: `%${value}%` };
@@ -158,7 +193,12 @@ exports.getIOCById = async (req, res) => {
 
     try {
 
-        const ioc = await IOC.findByPk(req.params.id);
+        const ioc = await IOC.findOne({
+            where: {
+                id: req.params.id,
+                workspaceId: req.workspaceId
+            }
+        });
 
         if (!ioc) {
 

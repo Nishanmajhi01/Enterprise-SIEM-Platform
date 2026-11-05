@@ -4,39 +4,13 @@ const AuditLog = require("../models/AuditLog");
 // Create audit log
 
 exports.createAuditLog = async (req, res) => {
-
-    try {
-
-        const audit = await AuditLog.create(req.body);
-
-
-        res.json({
-
-            message: "Audit log created",
-
-            audit
-
-        });
-
-
-    } catch(error) {
-
-
-        res.status(500).json({
-
-            error:error.message
-
-        });
-
-
-    }
-
+    return res.status(403).json({
+        error: "Direct audit log creation is disabled"
+    });
 };
 
 
-
-
-// Get all audit logs
+// Get audit logs for the authenticated workspace
 
 exports.getAuditLogs = async(req,res)=>{
 
@@ -45,11 +19,12 @@ exports.getAuditLogs = async(req,res)=>{
 
 
         const logs = await AuditLog.findAll({
-
-            order:[
-                ["createdAt","DESC"]
+            where: {
+                workspaceId: req.workspaceId
+            },
+            order: [
+                ["createdAt", "DESC"]
             ]
-
         });
 
 

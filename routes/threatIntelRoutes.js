@@ -5,6 +5,12 @@ const router = express.Router();
 const authenticate =
 require("../middleware/authMiddleware");
 
+const workspaceAuth =
+require("../middleware/workspaceAuth");
+
+const workspaceRbac =
+require("../middleware/workspaceRbac");
+
 
 const {
     scanHash,
@@ -20,6 +26,8 @@ const {
 router.get(
     "/",
     authenticate,
+    workspaceAuth,
+    workspaceRbac("ADMIN", "ANALYST", "VIEWER"),
     getThreatIntel
 );
 
@@ -33,6 +41,8 @@ router.get(
 router.get(
     "/hash/:hash",
     authenticate,
+    workspaceAuth,
+    workspaceRbac("ADMIN", "ANALYST"),
     scanHash
 );
 

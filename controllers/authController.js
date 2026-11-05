@@ -4,8 +4,8 @@ const User=require("../models/User");
 
 const generateToken=require("../utils/jwt");
 
-const createAuditLog =
-require("../utils/auditLogger");
+const createPlatformAuditLog =
+require("../utils/platformAuditLogger");
 
 
 
@@ -78,7 +78,7 @@ exports.register = async (req, res) => {
             role
         });
 
-        await createAuditLog({
+        await createPlatformAuditLog({
             username: req.user.username,
             action: "USER_REGISTER",
             module: "AUTH",
@@ -142,7 +142,7 @@ email
 if(!user){
 
 
-await createAuditLog({
+await createPlatformAuditLog({
 
 username:email,
 
@@ -184,7 +184,7 @@ user.password
 if(!valid){
 
 
-await createAuditLog({
+await createPlatformAuditLog({
 
 username:user.username,
 
@@ -218,7 +218,7 @@ message:"Invalid password"
 const token=
 generateToken(user);
 
-await createAuditLog({
+await createPlatformAuditLog({
 
 username:user.username,
 

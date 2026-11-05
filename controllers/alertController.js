@@ -1,3 +1,4 @@
+const WorkspaceMembership = require("../models/WorkspaceMembership");
 const Alert = require("../models/Alert");
 const { logAction } = require("../services/auditService");
 
@@ -16,6 +17,7 @@ exports.createAlert = async (req, res) => {
 
 
         const alert = await Alert.create({
+            workspaceId: req.workspaceId,
 
             title: req.body.title,
 
@@ -86,6 +88,10 @@ exports.getAlerts = async (req, res) => {
 
         const alerts = await Alert.findAll({
 
+            where: {
+                workspaceId: req.workspaceId
+            },
+
             order: [
                 ["createdAt", "DESC"]
             ]
@@ -131,9 +137,12 @@ exports.getAlertById = async(req,res)=>{
 
 
         const alert =
-        await Alert.findByPk(
-            req.params.id
-        );
+        await Alert.findOne({
+            where: {
+                id: req.params.id,
+                workspaceId: req.workspaceId
+            }
+        });
 
 
 
@@ -189,6 +198,7 @@ exports.createAlert = async(req,res)=>{
 
         const alert =
         await Alert.create({
+            workspaceId: req.workspaceId,
 
             title:req.body.title,
 
@@ -266,9 +276,12 @@ exports.updateAlertStatus = async(req,res)=>{
 
 
         const alert =
-        await Alert.findByPk(
-            req.params.id
-        );
+        await Alert.findOne({
+            where: {
+                id: req.params.id,
+                workspaceId: req.workspaceId
+            }
+        });
 
 
 
@@ -298,6 +311,7 @@ exports.updateAlertStatus = async(req,res)=>{
 
 
         await logAction({
+            workspaceId: req.workspaceId,
 
             user:req.user,
 
@@ -365,9 +379,12 @@ exports.assignAlert = async(req,res)=>{
 
 
         const alert =
-        await Alert.findByPk(
-            req.params.id
-        );
+        await Alert.findOne({
+            where: {
+                id: req.params.id,
+                workspaceId: req.workspaceId
+            }
+        });
 
 
 
@@ -385,6 +402,26 @@ exports.assignAlert = async(req,res)=>{
 
 
 
+
+        if (!Number.isSafeInteger(assignedTo) || assignedTo <= 0) {
+            return res.status(400).json({
+                error: "assignedTo must be a valid user ID"
+            });
+        }
+
+        const membership = await WorkspaceMembership.findOne({
+            where: {
+                userId: assignedTo,
+                workspaceId: req.workspaceId,
+                status: "ACTIVE"
+            }
+        });
+
+        if (!membership) {
+            return res.status(400).json({
+                error: "Assignee must be an active workspace member"
+            });
+        }
 
         alert.assignedTo=assignedTo;
 
@@ -449,9 +486,12 @@ exports.resolveAlert = async(req,res)=>{
 
 
         const alert =
-        await Alert.findByPk(
-            req.params.id
-        );
+        await Alert.findOne({
+            where: {
+                id: req.params.id,
+                workspaceId: req.workspaceId
+            }
+        });
 
 
 
@@ -489,6 +529,7 @@ exports.resolveAlert = async(req,res)=>{
 
 
         await logAction({
+            workspaceId: req.workspaceId,
 
 
             user:req.user,

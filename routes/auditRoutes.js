@@ -1,5 +1,11 @@
 const express=require("express");
 
+const authenticate = require("../middleware/authMiddleware");
+const workspaceAuth = require("../middleware/workspaceAuth");
+const workspaceRbac = require("../middleware/workspaceRbac");
+
+
+
 const router=express.Router();
 
 
@@ -15,6 +21,9 @@ getAuditLogs
 
 router.post(
 "/",
+authenticate,
+workspaceAuth,
+workspaceRbac(["ADMIN"]),
 createAuditLog
 );
 
@@ -22,6 +31,9 @@ createAuditLog
 
 router.get(
 "/",
+authenticate,
+workspaceAuth,
+workspaceRbac(["ADMIN"]),
 getAuditLogs
 );
 

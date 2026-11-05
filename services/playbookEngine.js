@@ -16,6 +16,9 @@ const {
 // ========================================================
 
 const executePlaybookUnlocked = async (incident) => {
+    if (!incident?.workspaceId) {
+        throw new Error("Workspace identity required for playbook execution");
+    }
         // =================================================
         // DDOS V2 SAFETY GUARD
         // Monitoring and incident creation only.
@@ -50,7 +53,8 @@ const executePlaybookUnlocked = async (incident) => {
                 severity:
                     incident.severity,
 
-                enabled: true
+                enabled: true,
+                workspaceId: incident.workspaceId
 
             }
 
@@ -93,6 +97,7 @@ const executePlaybookUnlocked = async (incident) => {
             const previousBlock = await ResponseAction.findOne({
                 where: {
                     incidentId: incident.id,
+                    workspaceId: incident.workspaceId,
                     action: "BLOCK_IP",
                     target: incident.sourceIP,
                     status: "SUCCESS"
@@ -123,6 +128,8 @@ const executePlaybookUnlocked = async (incident) => {
 
         const responseAction =
         await ResponseAction.create({
+
+            workspaceId: incident.workspaceId,
 
             incidentId:
                 incident.id,

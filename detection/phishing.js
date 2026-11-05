@@ -4,7 +4,15 @@ const {
 
 
 
-async function detectPhishing(url){
+async function detectPhishing(url, workspaceId){
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        throw new Error("Valid workspace ID required for phishing detection");
+    }
+
 
 
 
@@ -62,6 +70,7 @@ async function detectPhishing(url){
 
 
 
+            workspaceId,
             title:
             "Phishing URL Detected",
 

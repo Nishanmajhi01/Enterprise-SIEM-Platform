@@ -50,7 +50,10 @@ require("../middleware/authMiddleware");
 
 
 const rbac =
-require("../middleware/rbac");
+require("../middleware/workspaceRbac");
+
+const workspaceAuth =
+require("../middleware/workspaceAuth");
 
 
 
@@ -62,6 +65,7 @@ require("../middleware/rbac");
 router.post(
 "/",
 authenticate,
+workspaceAuth,
 rbac([
 "ADMIN",
 "ANALYST"
@@ -80,6 +84,7 @@ createIncident
 router.get(
 "/",
 authenticate,
+workspaceAuth,
 rbac([
 "ADMIN",
 "ANALYST",
@@ -99,6 +104,7 @@ getIncidents
 router.get(
 "/:id",
 authenticate,
+workspaceAuth,
 rbac([
 "ADMIN",
 "ANALYST",
@@ -111,6 +117,7 @@ getIncidentById
 router.patch(
 "/:id/contain",
 authenticate,
+workspaceAuth,
 rbac([
 "ADMIN",
 "ANALYST"
@@ -131,6 +138,7 @@ containIncident
 router.put(
 "/:id",
 authenticate,
+workspaceAuth,
 rbac([
 "ADMIN",
 "ANALYST"
@@ -150,6 +158,7 @@ updateIncident
 router.patch(
 "/:id/assign",
 authenticate,
+workspaceAuth,
 rbac([
 "ADMIN",
 "ANALYST"
@@ -161,6 +170,7 @@ assignIncident
 router.get(
 "/:id/assignments",
 authenticate,
+workspaceAuth,
 rbac([
 "ADMIN",
 "ANALYST",
@@ -181,6 +191,7 @@ getAssignments
 router.patch(
 "/:id/resolve",
 authenticate,
+workspaceAuth,
 rbac([
 "ADMIN",
 "ANALYST"
@@ -193,6 +204,7 @@ resolveIncident
 router.post(
 "/:id/comments",
 authenticate,
+workspaceAuth,
 rbac(["ADMIN", "ANALYST"]),
 commentController.addComment
 );
@@ -201,6 +213,7 @@ commentController.addComment
 router.patch(
 "/:id/close",
 authenticate,
+workspaceAuth,
 rbac([
 "ADMIN",
 "ANALYST"
@@ -213,6 +226,7 @@ router.post(
 "/:id/investigation",
 
 authenticate,
+workspaceAuth,
 
 rbac([
 "ADMIN",
@@ -229,6 +243,7 @@ router.patch(
 "/:id/acknowledge",
 
 authenticate,
+workspaceAuth,
 
 rbac([
 "ADMIN",
@@ -247,6 +262,7 @@ acknowledgeIncident
 router.patch(
     "/:id/manual-contain",
     authenticate,
+workspaceAuth,
     rbac(["ADMIN", "ANALYST"]),
     require("../controllers/incidentController").manualContainIncident
 );

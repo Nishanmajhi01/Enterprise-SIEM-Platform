@@ -10,7 +10,16 @@ let traffic = {};
 
 
 
-async function detectDDoS(ip){
+async function detectDDoS(ip, workspaceId){
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        throw new Error("Valid workspace ID required for DDoS detection");
+    }
+
+    const trafficKey = `${workspaceId}:${ip}`;
 
 
 
@@ -23,9 +32,9 @@ async function detectDDoS(ip){
 
 
 
-    if(!traffic[ip]){
+    if(!traffic[trafficKey]){
 
-        traffic[ip]=[];
+        traffic[trafficKey]=[];
 
     }
 
@@ -33,7 +42,7 @@ async function detectDDoS(ip){
 
 
 
-    traffic[ip].push(
+    traffic[trafficKey].push(
         Date.now()
     );
 
@@ -43,7 +52,7 @@ async function detectDDoS(ip){
 
 
     const requests =
-    traffic[ip].filter(
+    traffic[trafficKey].filter(
 
         time =>
         Date.now() - time < 60000
@@ -54,7 +63,7 @@ async function detectDDoS(ip){
 
 
 
-    traffic[ip] =
+    traffic[trafficKey] =
     requests;
 
 
@@ -67,6 +76,7 @@ async function detectDDoS(ip){
 
 
         await createSecurityAlert({
+              workspaceId,
 
 
 
@@ -136,7 +146,7 @@ async function detectDDoS(ip){
 
 
 
-        traffic[ip]=[];
+        traffic[trafficKey]=[];
 
     }
 

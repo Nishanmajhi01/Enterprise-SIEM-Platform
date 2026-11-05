@@ -17,6 +17,18 @@ const WINDOW_MS = 2 * 60 * 1000;
 
 async function detectBruteForce(event) {
 
+    const workspaceId = event?.workspaceId;
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        throw new Error(
+            "Valid workspace ID required for brute-force detection"
+        );
+    }
+
+
     /*
     ==========================================
     Only process REAL failed-login events
@@ -39,6 +51,7 @@ async function detectBruteForce(event) {
     */
 
     const ip = event.sourceIP;
+    const attemptKey = `${workspaceId}:${ip}`;
 
     if (
         !ip ||
@@ -57,13 +70,13 @@ async function detectBruteForce(event) {
     ==========================================
     */
 
-    if (!attempts[ip]) {
-        attempts[ip] = [];
+    if (!attempts[attemptKey]) {
+        attempts[attemptKey] = [];
     }
 
     const now = Date.now();
 
-    attempts[ip].push(now);
+    attempts[attemptKey].push(now);
 
 
     /*
@@ -72,11 +85,11 @@ async function detectBruteForce(event) {
     ==========================================
     */
 
-    attempts[ip] = attempts[ip].filter(
+    attempts[attemptKey] = attempts[attemptKey].filter(
         time => now - time <= WINDOW_MS
     );
 
-    const recentAttempts = attempts[ip];
+    const recentAttempts = attempts[attemptKey];
 
     console.log(
         `FAILED LOGIN: ${ip} | Attempts: ${recentAttempts.length}/${THRESHOLD}`
@@ -101,6 +114,7 @@ async function detectBruteForce(event) {
     */
 
     const alert = await createSecurityAlert({
+        workspaceId,
 
         title:
             "Brute Force Attack Detected",
@@ -140,7 +154,7 @@ async function detectBruteForce(event) {
     ==========================================
     */
 
-    attempts[ip] = [];
+    attempts[attemptKey] = [];
 
 
     return alert;

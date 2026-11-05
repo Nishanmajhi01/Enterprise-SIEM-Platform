@@ -1,4 +1,5 @@
 const Device = require("../models/Device");
+const Workspace = require("../models/Workspace");
 
 
 module.exports = async(req,res,next)=>{
@@ -55,16 +56,34 @@ error:"Device Disabled"
 
 
 
+
+
+
+
+// Validate workspace ownership using the authenticated device.
+if (!device.workspaceId) {
+    return res.status(403).json({
+        error: "Device has no workspace assigned"
+    });
+}
+
+const workspace = await Workspace.findByPk(device.workspaceId);
+
+if (!workspace || workspace.status !== "ACTIVE") {
+    return res.status(403).json({
+        error: "Device workspace is inactive or unavailable"
+    });
+}
+
+// Never trust a workspace ID supplied by the device.
+req.workspaceId = workspace.id;
+req.workspace = workspace;
+req.device = device;
+
+// Update heartbeat only after workspace verification.
 await device.update({
-
-lastHeartbeat:new Date()
-
+    lastHeartbeat: new Date()
 });
-
-
-
-req.device=device;
-
 
 next();
 
@@ -76,7 +95,7 @@ catch(error){
 
 res.status(500).json({
 
-error:error.message
+error:"Device authentication failed"
 
 });
 

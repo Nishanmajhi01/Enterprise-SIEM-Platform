@@ -16,6 +16,17 @@ function extractRawValues(raw){
 
 async function matchIOC(event){
 
+    const workspaceId = event?.workspaceId;
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        throw new Error(
+            "Valid workspace ID required for IOC matching"
+        );
+    }
+
     const matches = [];
 
     const ips = [
@@ -29,6 +40,7 @@ async function matchIOC(event){
         const ipMatches = await IOC.findAll({
 
             where:{
+                workspaceId,
                 type:"IP",
                 value:{ [Op.in]: ips },
                 isActive:true
@@ -50,6 +62,7 @@ async function matchIOC(event){
         const otherIOCs = await IOC.findAll({
 
             where:{
+                workspaceId,
                 type:{ [Op.in]:["DOMAIN","URL","HASH","EMAIL"] },
                 isActive:true
             }

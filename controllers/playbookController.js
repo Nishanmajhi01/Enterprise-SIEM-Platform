@@ -5,7 +5,24 @@ exports.createPlaybook = async (req, res) => {
 
     try {
 
-        const playbook = await ResponsePlaybook.create(req.body);
+        const {
+            name,
+            triggerType,
+            incidentId,
+            severity,
+            action,
+            enabled
+        } = req.body || {};
+
+        const playbook = await ResponsePlaybook.create({
+            workspaceId: req.workspaceId,
+            name,
+            triggerType,
+            incidentId,
+            severity,
+            action,
+            enabled
+        });
 
         res.json({
             success: true,
@@ -27,7 +44,11 @@ exports.getPlaybooks = async(req,res)=>{
 try{
 
 const playbooks =
-await ResponsePlaybook.findAll();
+await ResponsePlaybook.findAll({
+    where: {
+        workspaceId: req.workspaceId
+    }
+});
 
 
 res.json({
@@ -57,11 +78,36 @@ exports.updatePlaybook = async (req, res) => {
 
     try {
 
-        await ResponsePlaybook.update(req.body, {
-            where: { id: req.params.id }
+        const allowedFields = [
+            "name",
+            "triggerType",
+            "severity",
+            "action",
+            "enabled"
+        ];
+
+        const updates = {};
+
+        for (const field of allowedFields) {
+            if (Object.prototype.hasOwnProperty.call(req.body || {}, field)) {
+                updates[field] = req.body[field];
+            }
+        }
+
+        const playbook = await ResponsePlaybook.findOne({
+            where: {
+                id: req.params.id,
+                workspaceId: req.workspaceId
+            }
         });
 
-        const playbook = await ResponsePlaybook.findByPk(req.params.id);
+        if (!playbook) {
+            return res.status(404).json({
+                error: "Playbook not found"
+            });
+        }
+
+        await playbook.update(updates);
 
         res.json({
             success: true,
@@ -83,7 +129,12 @@ exports.togglePlaybook = async (req, res) => {
 
     try {
 
-        const playbook = await ResponsePlaybook.findByPk(req.params.id);
+        const playbook = await ResponsePlaybook.findOne({
+            where: {
+                id: req.params.id,
+                workspaceId: req.workspaceId
+            }
+        });
 
         if (!playbook) {
 

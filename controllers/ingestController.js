@@ -22,7 +22,16 @@ exports.ingestLog = async (req, res) => {
 
         const log = req.body;
 
+        if (!req.workspaceId ||
+            req.workspaceId !== device.workspaceId) {
+            return res.status(403).json({
+                error: "Invalid device workspace context"
+            });
+        }
+
         const eventData = {
+
+            workspaceId: req.workspaceId,
 
             deviceId: device.id,
 

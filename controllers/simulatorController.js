@@ -118,6 +118,8 @@ if(analysis.threatDetected){
 
 incident = await Incident.create({
 
+workspaceId: req.workspaceId,
+
 title: alert.title,
 
 attackType: alert.attackType,

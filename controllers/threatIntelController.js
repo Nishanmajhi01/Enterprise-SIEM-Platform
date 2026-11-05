@@ -46,6 +46,10 @@ exports.getThreatIntel = async(req,res)=>{
         const threats =
         await ThreatIntel.findAll({
 
+            where: {
+                workspaceId: req.workspaceId
+            },
+
             order:[
                 ["createdAt","DESC"]
             ]
@@ -234,6 +238,7 @@ exports.scanHash = async(req,res)=>{
 
         const newThreat =
         await ThreatIntel.create({
+            workspaceId: req.workspaceId,
 
 
 
@@ -346,6 +351,8 @@ exports.scanHash = async(req,res)=>{
         emitAlert({
 
 
+
+            workspaceId: newThreat.workspaceId,
 
             title:
 

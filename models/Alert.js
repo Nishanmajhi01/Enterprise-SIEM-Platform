@@ -17,7 +17,18 @@ const Alert = sequelize.define("Alert", {
 
 
 
-    title: {
+    workspaceId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+        model: "Workspaces",
+        key: "id"
+    },
+    onUpdate: "CASCADE",
+    onDelete: "RESTRICT"
+},
+
+title: {
 
         type: DataTypes.STRING,
 

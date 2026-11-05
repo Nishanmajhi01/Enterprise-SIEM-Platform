@@ -27,8 +27,11 @@ require("../middleware/authMiddleware");
 
 
 
-const rbac =
-require("../middleware/rbac");
+const workspaceAuth =
+require("../middleware/workspaceAuth");
+
+const workspaceRbac =
+require("../middleware/workspaceRbac");
 
 
 
@@ -45,7 +48,9 @@ router.get(
 
     authenticate,
 
-    rbac([
+    workspaceAuth,
+
+    workspaceRbac([
         "ADMIN",
         "ANALYST",
         "VIEWER"
@@ -73,7 +78,9 @@ router.post(
 
     authenticate,
 
-    rbac([
+    workspaceAuth,
+
+    workspaceRbac([
         "ADMIN",
         "ANALYST"
     ]),
@@ -99,7 +106,9 @@ router.get(
 
     authenticate,
 
-    rbac([
+    workspaceAuth,
+
+    workspaceRbac([
         "ADMIN",
         "ANALYST",
         "VIEWER"
@@ -126,7 +135,9 @@ router.patch(
 
     authenticate,
 
-    rbac([
+    workspaceAuth,
+
+    workspaceRbac([
         "ADMIN",
         "ANALYST"
     ]),
@@ -152,7 +163,9 @@ router.patch(
 
     authenticate,
 
-    rbac([
+    workspaceAuth,
+
+    workspaceRbac([
         "ADMIN",
         "ANALYST"
     ]),
@@ -178,7 +191,9 @@ router.patch(
 
     authenticate,
 
-    rbac([
+    workspaceAuth,
+
+    workspaceRbac([
         "ADMIN",
         "ANALYST"
     ]),

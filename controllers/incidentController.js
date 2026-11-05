@@ -138,6 +138,7 @@ const incident =
 await Incident.create({
 
     ...incidentData,
+    workspaceId: req.workspaceId,
     status: "OPEN",
 
     timeline:[
@@ -163,6 +164,7 @@ await Incident.create({
 
 
 await createAuditLog({
+            workspaceId: req.workspaceId,
 
 username:req.user?.username || "SYSTEM",
 
@@ -227,6 +229,10 @@ try{
 
 const incidents = await Incident.findAll({
 
+    where: {
+        workspaceId: req.workspaceId
+    },
+
     include:[
 
         {
@@ -289,11 +295,12 @@ try{
 
 
 const incident =
-await Incident.findByPk(
+await Incident.findOne({
 
-req.params.id,
-
-{
+where: {
+    id: req.params.id,
+    workspaceId: req.workspaceId
+},
 
 include:[
 
@@ -393,9 +400,12 @@ try{
 
 
 const incident =
-await Incident.findByPk(
-req.params.id
-);
+await Incident.findOne({
+    where: {
+        id: req.params.id,
+        workspaceId: req.workspaceId
+    }
+});
 
 
 
@@ -525,7 +535,12 @@ try{
 
 
 const incident =
-await Incident.findByPk(req.params.id);
+await Incident.findOne({
+    where: {
+        id: req.params.id,
+        workspaceId: req.workspaceId
+    }
+});
 
 
 if(!incident){
@@ -550,10 +565,35 @@ require("../models/User");
 
 
 
-const user =
-await User.findByPk(
-req.body.userId
-);
+const WorkspaceMembership =
+require("../models/WorkspaceMembership");
+
+const userId = Number(req.body?.userId);
+
+if (!Number.isSafeInteger(userId) || userId <= 0) {
+    return res.status(400).json({
+        message: "Valid assigned user ID required"
+    });
+}
+
+const membership = await WorkspaceMembership.findOne({
+    where: {
+        workspaceId: req.workspaceId,
+        userId,
+        status: "ACTIVE",
+        role: {
+            [require("sequelize").Op.in]: ["ADMIN", "ANALYST"]
+        }
+    }
+});
+
+if (!membership) {
+    return res.status(403).json({
+        message: "Assigned user must be an active ADMIN or ANALYST in this workspace"
+    });
+}
+
+const user = await User.findByPk(userId);
 
 
 
@@ -570,19 +610,7 @@ message:"Assigned user not found"
 
 
 
-if(
-user.role !== "ANALYST" &&
-user.role !== "ADMIN"
-){
 
-return res.status(403).json({
-
-message:
-"Only SOC analysts or admins can receive incidents"
-
-});
-
-}
 
 
 
@@ -590,13 +618,15 @@ message:
 const assignment =
 await IncidentAssignment.create({
 
-incidentId:incident.id,
+workspaceId: req.workspaceId,
 
-userId:user.id,
+incidentId: incident.id,
 
-username:user.username,
+userId: user.id,
 
-role:user.role
+username: user.username,
+
+role: membership.role
 
 });
 
@@ -626,7 +656,7 @@ action:"INCIDENT_ASSIGNED",
 
 assignedTo:user.username,
 
-assignedRole:user.role,
+assignedRole:membership.role,
 
 assignedBy:
 req.user?.username || "SYSTEM",
@@ -649,6 +679,7 @@ await incident.save();
 
 
 await createAuditLog({
+            workspaceId: req.workspaceId,
 
 userId:req.user?.id,
 
@@ -729,7 +760,8 @@ const assignments =
 await IncidentAssignment.findAll({
 
 where:{
-incidentId:req.params.id
+workspaceId: req.workspaceId,
+incidentId: req.params.id
 },
 
 order:[
@@ -799,7 +831,11 @@ exports.resolveIncident = async (req, res) => {
 
         await sequelize.transaction(async (transaction) => {
 
-            incident = await Incident.findByPk(req.params.id, {
+            incident = await Incident.findOne({
+                where: {
+                    id: req.params.id,
+                    workspaceId: req.workspaceId
+                },
                 transaction,
                 lock: transaction.LOCK.UPDATE
             });
@@ -841,6 +877,7 @@ exports.resolveIncident = async (req, res) => {
 
         try {
             await createAuditLog({
+            workspaceId: req.workspaceId,
                 userId: req.user.id,
                 username: req.user.username || "UNKNOWN",
                 action: "INCIDENT_RESOLVED",
@@ -897,7 +934,12 @@ try{
 
 
 const incident =
-await Incident.findByPk(req.params.id);
+await Incident.findOne({
+    where: {
+        id: req.params.id,
+        workspaceId: req.workspaceId
+    }
+});
 
 
 if(!incident){
@@ -1014,9 +1056,12 @@ try{
 
 
 const incident =
-await Incident.findByPk(
-req.params.id
-);
+await Incident.findOne({
+    where: {
+        id: req.params.id,
+        workspaceId: req.workspaceId
+    }
+});
 
 
 
@@ -1135,7 +1180,11 @@ exports.manualContainIncident = async (req, res) => {
 
         await sequelize.transaction(async (transaction) => {
 
-            incident = await Incident.findByPk(req.params.id, {
+            incident = await Incident.findOne({
+                where: {
+                    id: req.params.id,
+                    workspaceId: req.workspaceId
+                },
                 transaction,
                 lock: transaction.LOCK.UPDATE
             });
@@ -1155,6 +1204,7 @@ exports.manualContainIncident = async (req, res) => {
             }
 
             investigation = await Investigation.create({
+                workspaceId: incident.workspaceId,
                 incidentId: incident.id,
                 analystId: req.user.id,
                 action: "MANUAL_CONTAINMENT",
@@ -1185,6 +1235,7 @@ exports.manualContainIncident = async (req, res) => {
 
         try {
             await createAuditLog({
+            workspaceId: req.workspaceId,
                 userId: req.user.id,
                 username: req.user.username || "UNKNOWN",
                 action: "MANUAL_CONTAINMENT_RECORDED",

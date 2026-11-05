@@ -21,12 +21,24 @@ const { emitIncident, emitAlert } = require("../utils/socketEmitter");
 const CORRELATION_WINDOW_MS = 10 * 60 * 1000;
 
 async function findExistingDDoSIncident(result, options = {}) {
+    const workspaceId = options?.workspaceId;
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        throw new Error(
+            "Valid workspace ID required for DDoS correlation"
+        );
+    }
+
     const cutoff = new Date(
         Date.now() - CORRELATION_WINDOW_MS
     );
 
     const candidates = await Incident.findAll({
         where: {
+            workspaceId,
             attackType: "DDOS",
 
             status: {
@@ -60,6 +72,17 @@ async function findExistingDDoSIncident(result, options = {}) {
 }
 
 async function createDDoSIncident(result, options = {}) {
+
+    const workspaceId = options?.workspaceId;
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        throw new Error(
+            "Valid workspace ID required for DDoS incident creation"
+        );
+    }
 
     // Only process detections that require an alert.
     if (!result || result.shouldAlert !== true) {
@@ -97,6 +120,8 @@ async function createDDoSIncident(result, options = {}) {
                 replacements: {
                     lockKey:
                         "DDOS_V2:" +
+                        workspaceId +
+                        ":" +
                         result.destinationIP +
                         ":" +
                         result.detectionType
@@ -107,7 +132,7 @@ async function createDDoSIncident(result, options = {}) {
 
         const existing = await findExistingDDoSIncident(
             result,
-            { transaction }
+            { transaction, workspaceId }
         );
 
         if (existing) {
@@ -154,6 +179,7 @@ async function createDDoSIncident(result, options = {}) {
         };
 
         const incident = await Incident.create({
+            workspaceId,
 
             title: distributed
                 ? "Potential Distributed DDoS Activity Detected"
@@ -197,6 +223,7 @@ async function createDDoSIncident(result, options = {}) {
         }, { transaction });
 
         await Evidence.create({
+            workspaceId,
 
             incidentId: incident.id,
             type: "DDOS_V2_DETECTION",
@@ -214,6 +241,7 @@ async function createDDoSIncident(result, options = {}) {
         // Do not call createSecurityAlert(), which could
         // create a duplicate incident.
         const alert = await Alert.create({
+            workspaceId,
             title: incident.title,
             description: incident.description,
             severity,

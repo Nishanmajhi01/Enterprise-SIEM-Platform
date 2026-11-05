@@ -114,26 +114,12 @@ async function blockIP(ip) {
 
     const target = validateTargetIP(ip);
 
-    console.log(
-        `RESPONSE EXECUTOR: Blocking ${target} via pfSense`
+    // Multi-tenant safety: shared pfSense firewall changes
+    // are disabled until workspace-specific authorization,
+    // firewall ownership and isolation are implemented.
+    throw new Error(
+        "Shared pfSense firewall modifications are disabled"
     );
-
-    const result = await executePfSenseCommand(
-        "add",
-        target
-    );
-
-    return {
-        success: true,
-        simulated: false,
-        action: "BLOCK_IP",
-        target,
-        firewall: "pfSense",
-        table: BLOCK_TABLE,
-        output: result.stdout,
-        message:
-            `IP ${target} added to ${BLOCK_TABLE}`
-    };
 }
 
 
@@ -145,26 +131,12 @@ async function unblockIP(ip) {
 
     const target = validateTargetIP(ip);
 
-    console.log(
-        `RESPONSE EXECUTOR: Unblocking ${target} via pfSense`
+    // Multi-tenant safety: shared pfSense firewall changes
+    // are disabled until workspace-specific authorization,
+    // firewall ownership and isolation are implemented.
+    throw new Error(
+        "Shared pfSense firewall modifications are disabled"
     );
-
-    const result = await executePfSenseCommand(
-        "delete",
-        target
-    );
-
-    return {
-        success: true,
-        simulated: false,
-        action: "UNBLOCK_IP",
-        target,
-        firewall: "pfSense",
-        table: BLOCK_TABLE,
-        output: result.stdout,
-        message:
-            `IP ${target} removed from ${BLOCK_TABLE}`
-    };
 }
 
 

@@ -1,4 +1,5 @@
 const SecurityEvent = require("../models/SecurityEvent");
+const Device = require("../models/Device");
 
 const { Op } = require("sequelize");
 
@@ -17,8 +18,57 @@ exports.createEvent = async (req, res) => {
 
     try {
 
+        if (!req.workspaceId) {
+            return res.status(403).json({
+                message: "Verified workspace access required"
+            });
+        }
+
+        if (
+            !req.body ||
+            typeof req.body !== "object" ||
+            Array.isArray(req.body)
+        ) {
+            return res.status(400).json({
+                message: "Invalid event payload"
+            });
+        }
+
+        const requestedDeviceId = req.body.deviceId;
+
+        if (requestedDeviceId !== undefined &&
+            requestedDeviceId !== null) {
+
+            const deviceId = Number(requestedDeviceId);
+
+            if (!Number.isSafeInteger(deviceId) ||
+                deviceId <= 0) {
+                return res.status(400).json({
+                    message: "Invalid device ID"
+                });
+            }
+
+            const device = await Device.findOne({
+                where: {
+                    id: deviceId,
+                    workspaceId: req.workspaceId
+                }
+            });
+
+            if (!device) {
+                return res.status(403).json({
+                    message: "Device does not belong to this workspace"
+                });
+            }
+        }
+
+        const eventData = {
+            ...req.body,
+            workspaceId: req.workspaceId
+        };
+
         const result =
-        await processSecurityEvent(req.body);
+        await processSecurityEvent(eventData);
 
         res.json({
 

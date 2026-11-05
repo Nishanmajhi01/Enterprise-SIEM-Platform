@@ -12,7 +12,8 @@ const {
 
 const authenticate = require("../middleware/authMiddleware");
 const { validateIOC } = require("../middleware/iocValidator");
-const rbac = require("../middleware/rbac");
+const workspaceAuth = require("../middleware/workspaceAuth");
+const workspaceRbac = require("../middleware/workspaceRbac");
 
 /**
  * CREATE IOC
@@ -21,7 +22,8 @@ const rbac = require("../middleware/rbac");
 router.post(
     "/",
     authenticate,
-    rbac(["ADMIN", "ANALYST"]),
+    workspaceAuth,
+    workspaceRbac(["ADMIN", "ANALYST"]),
     validateIOC,
     createIOC
 );
@@ -33,7 +35,8 @@ router.post(
 router.get(
     "/",
     authenticate,
-    rbac(["ADMIN", "ANALYST", "VIEWER"]),
+    workspaceAuth,
+    workspaceRbac(["ADMIN", "ANALYST", "VIEWER"]),
     getIOCs
 );
 
@@ -45,7 +48,8 @@ router.get(
 router.get(
     "/search",
     authenticate,
-    rbac(["ADMIN", "ANALYST", "VIEWER"]),
+    workspaceAuth,
+    workspaceRbac(["ADMIN", "ANALYST", "VIEWER"]),
     searchIOCs
 );
 
@@ -56,7 +60,8 @@ router.get(
 router.get(
     "/:id",
     authenticate,
-    rbac(["ADMIN", "ANALYST", "VIEWER"]),
+    workspaceAuth,
+    workspaceRbac(["ADMIN", "ANALYST", "VIEWER"]),
     getIOCById
 );
 
@@ -67,7 +72,8 @@ router.get(
 router.put(
     "/:id",
     authenticate,
-    rbac(["ADMIN", "ANALYST"]),
+    workspaceAuth,
+    workspaceRbac(["ADMIN", "ANALYST"]),
     validateIOC,
     updateIOC
 );
@@ -79,7 +85,8 @@ router.put(
 router.delete(
     "/:id",
     authenticate,
-    rbac(["ADMIN"]),
+    workspaceAuth,
+    workspaceRbac(["ADMIN"]),
     deleteIOC
 );
 

@@ -9,6 +9,17 @@ const Device = sequelize.define("Device", {
         primaryKey:true
     },
 
+    workspaceId:{
+        type:DataTypes.UUID,
+        allowNull:false,
+        references:{
+            model:"Workspaces",
+            key:"id"
+        },
+        onUpdate:"CASCADE",
+        onDelete:"RESTRICT"
+    },
+
     name:{
         type:DataTypes.STRING,
         allowNull:false

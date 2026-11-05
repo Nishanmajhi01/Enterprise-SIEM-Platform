@@ -9,6 +9,17 @@ const IOC = sequelize.define("IOC", {
         primaryKey: true
     },
 
+    workspaceId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+            model: "Workspaces",
+            key: "id"
+        },
+        onUpdate: "CASCADE",
+        onDelete: "RESTRICT"
+    },
+
     type: {
         type: DataTypes.ENUM(
             "IP",

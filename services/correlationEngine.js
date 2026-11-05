@@ -15,6 +15,18 @@ exports.runCorrelation = async(
     detection = {}
 )=>{
 
+    const workspaceId = event?.workspaceId;
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        throw new Error(
+            "Valid workspace ID required for correlation"
+        );
+    }
+
+
 
     const result = {
 
@@ -78,6 +90,7 @@ exports.runCorrelation = async(
 
     const securityResult =
     await createSecurityAlert({
+          workspaceId,
 
 
 
@@ -154,12 +167,8 @@ exports.runCorrelation = async(
     securityResult.incident.id;
 
 
-    await event.update({
-
-        incidentId:
-        securityResult.incident.id
-
-    });
+    // Event-to-incident linking requires a separate
+      // workspace-scoped database operation.
 
 
 }

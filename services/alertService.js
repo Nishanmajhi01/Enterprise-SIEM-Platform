@@ -12,6 +12,18 @@ require("./incidentCreator");
 
 exports.createSecurityAlert = async(data)=>{
 
+    const workspaceId = data?.workspaceId;
+
+    if (
+        typeof workspaceId !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)
+    ) {
+        throw new Error(
+            "Valid workspace ID required for security alert creation"
+        );
+    }
+
+
 
     try{
 
@@ -23,6 +35,8 @@ exports.createSecurityAlert = async(data)=>{
 
         const alert =
         await Alert.create({
+
+            workspaceId,
 
 
 

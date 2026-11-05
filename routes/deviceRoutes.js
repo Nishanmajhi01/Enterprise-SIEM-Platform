@@ -1,46 +1,55 @@
-const express = require("express");
+"use strict";
 
+const express = require("express");
 const router = express.Router();
 
-const deviceController = require("../controllers/deviceController");
+const deviceController =
+    require("../controllers/deviceController");
 
-const authenticate = require("../middleware/authMiddleware");
-const rbac = require("../middleware/rbac");
+const authenticate =
+    require("../middleware/authMiddleware");
 
+const workspaceAuth =
+    require("../middleware/workspaceAuth");
 
-// Registering a device issues an API key — ADMIN only
+const workspaceRbac =
+    require("../middleware/workspaceRbac");
+
+router.use(authenticate);
+router.use(workspaceAuth);
+
+// Register device: ADMIN only
 router.post(
     "/",
-    authenticate,
-    rbac(["ADMIN"]),
+    workspaceRbac("ADMIN"),
     deviceController.registerDevice
 );
 
+// List devices: all workspace roles
 router.get(
     "/",
-    authenticate,
-    rbac(["ADMIN", "ANALYST", "VIEWER"]),
+    workspaceRbac("ADMIN", "ANALYST", "VIEWER"),
     deviceController.getDevices
 );
 
+// Update status: ADMIN only
 router.patch(
     "/:id/status",
-    authenticate,
-    rbac(["ADMIN"]),
+    workspaceRbac("ADMIN"),
     deviceController.updateDeviceStatus
 );
 
+// Regenerate API key: ADMIN only
 router.patch(
     "/:id/regenerate-key",
-    authenticate,
-    rbac(["ADMIN"]),
+    workspaceRbac("ADMIN"),
     deviceController.regenerateApiKey
 );
 
+// Delete device: ADMIN only
 router.delete(
     "/:id",
-    authenticate,
-    rbac(["ADMIN"]),
+    workspaceRbac("ADMIN"),
     deviceController.deleteDevice
 );
 

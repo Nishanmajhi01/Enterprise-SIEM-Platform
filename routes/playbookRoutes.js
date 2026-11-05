@@ -6,13 +6,15 @@ const router = express.Router();
 const playbookController= require("../controllers/playbookController");
 
 const authenticate = require("../middleware/authMiddleware");
-const rbac = require("../middleware/rbac");
+const workspaceAuth = require("../middleware/workspaceAuth");
+const workspaceRbac = require("../middleware/workspaceRbac");
 
 
 router.post(
     "/",
     authenticate,
-    rbac(["ADMIN", "ANALYST"]),
+    workspaceAuth,
+    workspaceRbac(["ADMIN", "ANALYST"]),
     playbookController.createPlaybook
 );
 
@@ -20,7 +22,8 @@ router.post(
 router.get(
 "/",
 authenticate,
-rbac(["ADMIN", "ANALYST", "VIEWER"]),
+workspaceAuth,
+workspaceRbac(["ADMIN", "ANALYST", "VIEWER"]),
 playbookController.getPlaybooks
 );
 
@@ -28,7 +31,8 @@ playbookController.getPlaybooks
 router.put(
     "/:id",
     authenticate,
-    rbac(["ADMIN", "ANALYST"]),
+    workspaceAuth,
+    workspaceRbac(["ADMIN", "ANALYST"]),
     playbookController.updatePlaybook
 );
 
@@ -36,7 +40,8 @@ router.put(
 router.patch(
     "/:id/toggle",
     authenticate,
-    rbac(["ADMIN", "ANALYST"]),
+    workspaceAuth,
+    workspaceRbac(["ADMIN", "ANALYST"]),
     playbookController.togglePlaybook
 );
 

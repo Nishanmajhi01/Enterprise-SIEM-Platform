@@ -1,13 +1,25 @@
 const express = require("express");
 const router = express.Router();
 
+const authenticate = require("../middleware/authMiddleware");
+const workspaceAuth = require("../middleware/workspaceAuth");
+const workspaceRbac = require("../middleware/workspaceRbac");
+
 const { runCorrelation } = require("../services/correlationEngine");
 
-router.post("/", async (req, res) => {
+router.post(
+    "/",
+    authenticate,
+    workspaceAuth,
+    workspaceRbac("ADMIN", "ANALYST"),
+    async (req, res) => {
 
     try {
 
-        const result = await runCorrelation(req.body);
+        const result = await runCorrelation({
+            ...req.body,
+            workspaceId: req.workspaceId
+        });
 
         res.json(result);
 

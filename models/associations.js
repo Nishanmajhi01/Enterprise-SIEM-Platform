@@ -198,3 +198,27 @@ IncidentAssignment.belongsTo(User,{
     foreignKey:"userId",
     as:"user"
 });
+// Multi-tenant workspace associations
+
+const Workspace = require("./Workspace");
+const WorkspaceMembership = require("./WorkspaceMembership");
+
+Workspace.hasMany(WorkspaceMembership, {
+  foreignKey: "workspaceId",
+  as: "memberships"
+});
+
+WorkspaceMembership.belongsTo(Workspace, {
+  foreignKey: "workspaceId",
+  as: "workspace"
+});
+
+User.hasMany(WorkspaceMembership, {
+  foreignKey: "userId",
+  as: "workspaceMemberships"
+});
+
+WorkspaceMembership.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user"
+});
