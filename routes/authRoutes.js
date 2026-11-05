@@ -203,6 +203,61 @@ router.post(
 );
 
 /*
+ * Self-service password change. Requires the current password and a valid JWT.
+ * Does not permit changing another user's password.
+ */
+router.post("/change-password", authenticate, async (req, res) => {
+    const bcrypt = require("bcrypt");
+    const User = require("../models/User");
+    const { currentPassword, newPassword } = req.body || {};
+
+    if (typeof currentPassword !== "string" ||
+        typeof newPassword !== "string" ||
+        newPassword.length < 12 ||
+        Buffer.byteLength(newPassword, "utf8") > 72 ||
+        currentPassword === newPassword) {
+        return res.status(400).json({
+            message: "Current password and a different new password (12-72 UTF-8 bytes) required"
+        });
+    }
+
+    if (!Number.isSafeInteger(req.user?.id) || req.user.id <= 0) {
+        return res.status(401).json({ message: "Authentication required" });
+    }
+
+    try {
+        const user = await User.findByPk(req.user.id);
+        if (!user) {
+            return res.status(401).json({ message: "Authentication required" });
+        }
+        const valid = await bcrypt.compare(currentPassword, user.password);
+        if (!valid) {
+            return res.status(403).json({ message: "Current password is incorrect" });
+        }
+        user.password = await bcrypt.hash(newPassword, 10);
+        await user.save();
+
+        try {
+            await require("../utils/platformAuditLogger")({
+                username: user.username,
+                action: "PASSWORD_CHANGE",
+                module: "AUTH",
+                severity: "MEDIUM",
+                ipAddress: req.ip,
+                description: "User changed their own account password"
+            });
+        } catch (auditError) {
+            console.error("Password change audit failed:", auditError);
+        }
+
+        return res.json({ success: true, message: "Password updated successfully" });
+    } catch (error) {
+        console.error("Password change failed:", error);
+        return res.status(500).json({ message: "Unable to change password" });
+    }
+});
+
+/*
  * Login remains publicly accessible.
  */
 router.post(
