@@ -141,4 +141,34 @@ router.post("/verify-email", limit, async (req, res) => {
   }
 });
 
+
+/*
+ * Public resend for accounts pending email verification.
+ * Always return the same response for unknown, verified, and pending addresses.
+ */
+router.post("/resend-verification", limit, async (req, res) => {
+  const { email } = req.body || {};
+  if (!emailValid(email)) {
+    return res.status(400).json({ message: "Valid email required" });
+  }
+  try {
+    const user = await User.findOne({ where: { email: email.trim().toLowerCase() } });
+    if (user && !user.emailVerifiedAt) {
+      const token = await issue({
+        purpose: "VERIFY_EMAIL", email: user.email, userId: user.id
+      });
+      const { sendVerificationEmail } = require("../services/resendEmailService");
+      try {
+        await sendVerificationEmail({ to: user.email, name: user.username, token });
+      } catch (error) {
+        console.error("Verification resend delivery failed:", error.message);
+      }
+    }
+    return res.json({ message: generic });
+  } catch (error) {
+    console.error("Verification resend failed:", error.message);
+    return res.status(500).json({ message: "Unable to process request" });
+  }
+});
+
 module.exports = router;
