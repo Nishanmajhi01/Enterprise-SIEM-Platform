@@ -4,6 +4,7 @@ const router = express.Router();
 
 const authenticate = require("../middleware/authMiddleware");
 const rbac = require("../middleware/rbac");
+const { loginLimiter } = require("../middleware/rateLimiter");
 
 const {
     register,
@@ -262,6 +263,7 @@ router.post("/change-password", authenticate, async (req, res) => {
  */
 router.post(
     "/login",
+    loginLimiter,
     login
 );
 
