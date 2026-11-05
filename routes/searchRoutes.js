@@ -12,8 +12,8 @@ const authenticate =
 require("../middleware/authMiddleware");
 
 
-const rbac =
-require("../middleware/rbac");
+const workspaceAuth = require("../middleware/workspaceAuth");
+const workspaceRbac = require("../middleware/workspaceRbac");
 
 
 
@@ -23,11 +23,8 @@ router.get(
 
     authenticate,
 
-    rbac([
-        "ADMIN",
-        "ANALYST",
-        "VIEWER"
-    ]),
+    workspaceAuth,
+    workspaceRbac("ADMIN", "ANALYST", "VIEWER"),
 
     searchEvents
 
