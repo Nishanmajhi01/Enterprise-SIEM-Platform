@@ -6,20 +6,19 @@ const authenticate = require("../middleware/authMiddleware");
 const rbac = require("../middleware/rbac");
 const { loginLimiter } = require("../middleware/rateLimiter");
 
-const {
-    register,
-    login
-} = require("../controllers/authController");
+const { login } = require("../controllers/authController");
 
 /*
- * User registration:
- * Only authenticated administrators can create accounts.
+ * Legacy administrator account provisioning is retired.
+ * Workspace members join through email invitations instead.
  */
 router.post(
     "/register",
     authenticate,
     rbac(["ADMIN"]),
-    register
+    (_req, res) => res.status(410).json({
+        message: "Direct account registration is retired. Send a workspace invitation instead."
+    })
 );
 
 /*
