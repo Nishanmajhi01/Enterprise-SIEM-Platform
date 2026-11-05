@@ -37,6 +37,12 @@ allowNull:false
 role:{
 type:DataTypes.STRING,
 defaultValue:"VIEWER"
+},
+
+emailVerifiedAt:{
+type:DataTypes.DATE,
+allowNull:true,
+defaultValue:null
 }
 
 },
