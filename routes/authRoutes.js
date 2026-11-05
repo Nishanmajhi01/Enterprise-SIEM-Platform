@@ -133,7 +133,7 @@ router.post(
         if (typeof username !== "string" || username.trim().length < 3 ||
             username.trim().length > 100 ||
             typeof email !== "string" || email.length > 254 ||
-            !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.trim()) ||
+            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
             typeof password !== "string" || password.length < 12 ||
             password.length > 72 ||
             !["ADMIN", "ANALYST", "VIEWER"].includes(role)) {
