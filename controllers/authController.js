@@ -115,148 +115,53 @@ exports.register = async (req, res) => {
 };
 
 
-exports.login=async(req,res)=>{
-
-
-try{
-
-
-const {
-email,
-password
-}=req.body;
-
-
-
-const user=
-await User.findOne({
-
-where:{
-email
-}
-
-});
-
-
-
-if(!user){
-
-
-await createPlatformAuditLog({
-
-username:email,
-
-action:"LOGIN_FAILED",
-
-module:"AUTH",
-
-severity:"MEDIUM",
-
-ipAddress:req.ip,
-
-description:
-"Login failed - User not found"
-
-});
-
-
-
-return res.status(404)
-.json({
-
-message:"User not found"
-
-});
-
-
-}
-
-
-
-const valid=
-await bcrypt.compare(
-password,
-user.password
-);
-
-
-
-if(!valid){
-
-
-await createPlatformAuditLog({
-
-username:user.username,
-
-action:"LOGIN_FAILED",
-
-module:"AUTH",
-
-severity:"MEDIUM",
-
-ipAddress:req.ip,
-
-description:
-"Login failed - Incorrect password"
-
-});
-
-
-
-return res.status(401)
-.json({
-
-message:"Invalid password"
-
-});
-
-
-}
-
-
-
-const token=
-generateToken(user);
-
-await createPlatformAuditLog({
-
-username:user.username,
-
-action:"LOGIN_SUCCESS",
-
-module:"AUTH",
-
-severity:"LOW",
-
-ipAddress:req.ip,
-
-description:
-"User successfully logged into SIEM platform"
-
-});
-
-
-
-res.json({
-
-message:"Login Successful",
-
-token
-
-});
-
-
-
-}catch(error){
-
-res.status(500)
-.json({
-
-error:error.message
-
-});
-
-}
-
-
+// Use identical client responses for unknown accounts and incorrect passwords.
+// Login remains public, but account existence must not be disclosed.
+exports.login = async (req, res) => {
+    try {
+        const { email, password } = req.body || {};
+        if (typeof email !== "string" || typeof password !== "string" ||
+            email.length > 254 || !email.trim() || !password) {
+            return res.status(400).json({ message: "Email and password required" });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+        const user = await User.findOne({ where: { email: normalizedEmail } });
+        const valid = user ? await bcrypt.compare(password, user.password) : false;
+
+        if (!valid) {
+            try {
+                await createPlatformAuditLog({
+                    username: user?.username || normalizedEmail,
+                    action: "LOGIN_FAILED",
+                    module: "AUTH",
+                    severity: "MEDIUM",
+                    ipAddress: req.ip,
+                    description: "Login failed - invalid credentials"
+                });
+            } catch (auditError) {
+                console.error("Login failure audit failed:", auditError);
+            }
+            return res.status(401).json({ message: "Invalid email or password" });
+        }
+
+        const token = generateToken(user);
+        try {
+            await createPlatformAuditLog({
+                username: user.username,
+                action: "LOGIN_SUCCESS",
+                module: "AUTH",
+                severity: "LOW",
+                ipAddress: req.ip,
+                description: "User successfully logged into SIEM platform"
+            });
+        } catch (auditError) {
+            console.error("Login success audit failed:", auditError);
+        }
+
+        return res.json({ message: "Login Successful", token });
+    } catch (error) {
+        console.error("Login failed:", error);
+        return res.status(500).json({ message: "Unable to process login" });
+    }
 };
