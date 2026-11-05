@@ -64,6 +64,55 @@ router.get("/workspaces", authenticate, async (req, res) => {
 });
 
 /*
+ * Workspace administrator: list members without exposing passwords or tokens.
+ * Access is verified against the selected active workspace, not just JWT role.
+ */
+router.get(
+    "/workspace-members",
+    authenticate,
+    require("../middleware/workspaceAuth"),
+    require("../middleware/workspaceRbac")("ADMIN"),
+    async (req, res) => {
+        try {
+            const WorkspaceMembership = require("../models/WorkspaceMembership");
+            const User = require("../models/User");
+            require("../models/associations");
+
+            const members = await WorkspaceMembership.findAll({
+                where: { workspaceId: req.workspaceId },
+                attributes: ["id", "role", "status", "createdAt"],
+                include: [{
+                    model: User,
+                    as: "user",
+                    required: true,
+                    attributes: ["id", "username", "email"]
+                }],
+                order: [["createdAt", "ASC"]]
+            });
+
+            return res.json({
+                workspaceId: req.workspaceId,
+                members: members.map(member => ({
+                    membershipId: member.id,
+                    role: member.role,
+                    status: member.status,
+                    user: {
+                        id: member.user.id,
+                        username: member.user.username,
+                        email: member.user.email
+                    }
+                }))
+            });
+        } catch (error) {
+            console.error("Unable to list workspace members:", error);
+            return res.status(500).json({
+                message: "Unable to load workspace members"
+            });
+        }
+    }
+);
+
+/*
  * Login remains publicly accessible.
  */
 router.post(
