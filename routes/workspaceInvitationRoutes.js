@@ -1,12 +1,14 @@
 "use strict";
 const express = require("express");
 const bcrypt = require("bcrypt");
-const { randomUUID } = require("crypto");
+const { randomUUID, createHash } = require("crypto");
+const { Op } = require("sequelize");
 const rateLimit = require("express-rate-limit");
 const { sequelize } = require("../config/database");
 const User = require("../models/User");
 const Workspace = require("../models/Workspace");
 const WorkspaceMembership = require("../models/WorkspaceMembership");
+const EmailActionToken = require("../models/EmailActionToken");
 const { issue, consume } = require("../services/emailActionTokens");
 const { sendInvitationEmail, configured } = require("../services/resendEmailService");
 const authenticate = require("../middleware/authMiddleware");
@@ -33,7 +35,31 @@ router.post("/", authenticate, workspaceAuth, workspaceRbac("ADMIN"), throttle, 
     const workspace = await Workspace.findByPk(req.workspaceId);
     if (!workspace || workspace.status !== "ACTIVE") return res.status(403).json({ message: "Workspace is not active" });
     const token = await issue({ purpose: "INVITE", email: normalized, workspaceId: workspace.id, workspaceRole: role });
-    await sendInvitationEmail({ to: normalized, workspaceName: workspace.name, token });
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    try {
+      await sendInvitationEmail({ to: normalized, workspaceName: workspace.name, token });
+    } catch (deliveryError) {
+      // Undelivered invitation links must not remain redeemable.
+      try {
+        await EmailActionToken.destroy({ where: { tokenHash, purpose: "INVITE" } });
+      } catch (cleanupError) {
+        console.error("Undelivered invitation cleanup failed:", cleanupError.message);
+      }
+      throw deliveryError;
+    }
+    // A replacement invitation supersedes older pending links for the same address and workspace.
+    // Do not invalidate older links until the new email has been accepted by the provider.
+    try {
+      await EmailActionToken.update({ consumedAt: new Date() }, {
+        where: {
+          purpose: "INVITE", email: normalized, workspaceId: workspace.id,
+          consumedAt: null, tokenHash: { [Op.ne]: tokenHash }
+        }
+      });
+    } catch (revokeError) {
+      // Email was already sent; do not misreport a delivery failure.
+      console.error("Previous invitation revocation failed:", revokeError.message);
+    }
     return res.status(202).json({ message: "Invitation email requested. Link expires in 48 hours." });
   } catch (error) {
     console.error("Workspace invitation failed:", error.message);
