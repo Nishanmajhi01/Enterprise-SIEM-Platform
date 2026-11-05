@@ -145,6 +145,13 @@ exports.login = async (req, res) => {
             return res.status(401).json({ message: "Invalid email or password" });
         }
 
+        if (!user.emailVerifiedAt) {
+            return res.status(403).json({
+                message: "Please verify your email address before signing in.",
+                code: "EMAIL_VERIFICATION_REQUIRED"
+            });
+        }
+
         const token = generateToken(user);
         try {
             await createPlatformAuditLog({
