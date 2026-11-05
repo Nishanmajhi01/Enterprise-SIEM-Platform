@@ -17,6 +17,7 @@ const throttle = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders
 const validEmail = value => typeof value === "string" && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 const validToken = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 const roles = ["ADMIN", "ANALYST", "VIEWER"];
+const ineligible = () => { const error = new Error("Invitation is not eligible"); error.code = "INVITE_INELIGIBLE"; throw error; };
 
 router.post("/", authenticate, workspaceAuth, workspaceRbac("ADMIN"), throttle, async (req, res) => {
   const { email, role = "VIEWER" } = req.body || {};
@@ -50,11 +51,11 @@ router.post("/accept-existing", authenticate, throttle, async (req, res) => {
       const action = await consume({ token, purpose: "INVITE", transaction });
       if (!action) return false;
       const user = await User.findByPk(req.user.id, { transaction });
-      if (!user || user.email.toLowerCase() !== action.email || !user.emailVerifiedAt) return false;
+      if (!user || user.email.toLowerCase() !== action.email || !user.emailVerifiedAt) ineligible();
       const workspace = await Workspace.findByPk(action.workspaceId, { transaction });
-      if (!workspace || workspace.status !== "ACTIVE") return false;
+      if (!workspace || workspace.status !== "ACTIVE") ineligible();
       const membership = await WorkspaceMembership.findOne({ where: { workspaceId: action.workspaceId, userId: user.id }, transaction });
-      if (membership) return false;
+      if (membership) ineligible();
       await WorkspaceMembership.create({
         id: randomUUID(), workspaceId: action.workspaceId, userId: user.id,
         role: action.workspaceRole, status: "ACTIVE"
@@ -64,6 +65,7 @@ router.post("/accept-existing", authenticate, throttle, async (req, res) => {
     return accepted ? res.json({ message: "Invitation accepted. Workspace access granted." }) :
       res.status(400).json({ message: "Invalid, expired, or ineligible invitation" });
   } catch (error) {
+    if (error.code === "INVITE_INELIGIBLE") return res.status(400).json({ message: "Invalid, expired, or ineligible invitation" });
     if (error.name === "SequelizeUniqueConstraintError") return res.status(409).json({ message: "Workspace membership already exists" });
     console.error("Invitation acceptance failed:", error.message);
     return res.status(500).json({ message: "Unable to accept invitation" });
@@ -85,9 +87,9 @@ router.post("/accept-new", throttle, async (req, res) => {
       const action = await consume({ token, purpose: "INVITE", transaction });
       if (!action) return false;
       const existing = await User.findOne({ where: { email: action.email }, transaction });
-      if (existing) return false;
+      if (existing) ineligible();
       const workspace = await Workspace.findByPk(action.workspaceId, { transaction });
-      if (!workspace || workspace.status !== "ACTIVE") return false;
+      if (!workspace || workspace.status !== "ACTIVE") ineligible();
       const user = await User.create({
         username: username.trim(), email: action.email, password: hash,
         role: "VIEWER", emailVerifiedAt: new Date()
@@ -101,6 +103,7 @@ router.post("/accept-new", throttle, async (req, res) => {
     return accepted ? res.status(201).json({ message: "Invitation accepted. Please sign in." }) :
       res.status(400).json({ message: "Invalid, expired, or ineligible invitation. Existing users must sign in first." });
   } catch (error) {
+    if (error.code === "INVITE_INELIGIBLE") return res.status(400).json({ message: "Invalid, expired, or ineligible invitation" });
     if (error.name === "SequelizeUniqueConstraintError") return res.status(409).json({ message: "Account or membership already exists" });
     console.error("New invitation acceptance failed:", error.message);
     return res.status(500).json({ message: "Unable to accept invitation" });
