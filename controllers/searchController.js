@@ -5,6 +5,7 @@ const { Op } = require("sequelize");
 exports.searchEvents = async (req, res) => {
 
     try {
+        if (!req.workspaceId) return res.status(403).json({ message: "Verified workspace access required" });
 
         const {
             ip,
@@ -19,7 +20,22 @@ exports.searchEvents = async (req, res) => {
         } = req.query;
 
 
-        let where = {};
+        // Scope every query to the authenticated workspace, never client input.
+        const where = { workspaceId: req.workspaceId };
+        const pageNumber = Number(page);
+        const pageSize = Number(limit);
+        if (!Number.isSafeInteger(pageNumber) || pageNumber < 1 ||
+            !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 200) {
+            return res.status(400).json({ message: "Page must be positive and limit must be between 1 and 200" });
+        }
+        if ((from && !to) || (!from && to) ||
+            (from && (!Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to)) ||
+              new Date(from) > new Date(to)))) {
+            return res.status(400).json({ message: "Valid from and to dates required" });
+        }
+        if (deviceId !== undefined && (!Number.isSafeInteger(Number(deviceId)) || Number(deviceId) < 1)) {
+            return res.status(400).json({ message: "Invalid device ID" });
+        }
 
 
         // Search by source IP
@@ -78,7 +94,7 @@ exports.searchEvents = async (req, res) => {
 
 
         const offset =
-        (page - 1) * limit;
+        (pageNumber - 1) * pageSize;
 
 
 
@@ -87,9 +103,9 @@ exports.searchEvents = async (req, res) => {
 
             where,
 
-            limit: Number(limit),
+            limit: pageSize,
 
-            offset: Number(offset),
+            offset,
 
 
             order:[
@@ -107,12 +123,12 @@ exports.searchEvents = async (req, res) => {
 
             total: result.count,
 
-            page: Number(page),
+            page: pageNumber,
 
             limit: Number(limit),
 
             totalPages:
-            Math.ceil(result.count / limit),
+            Math.ceil(result.count / pageSize),
 
             events: result.rows
 
