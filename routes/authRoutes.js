@@ -135,10 +135,10 @@ router.post(
             typeof email !== "string" || email.length > 254 ||
             !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
             typeof password !== "string" || password.length < 12 ||
-            password.length > 72 ||
+            Buffer.byteLength(password, "utf8") > 72 ||
             !["ADMIN", "ANALYST", "VIEWER"].includes(role)) {
             return res.status(400).json({
-                message: "Valid username (3-100), email, password (12-72) and workspace role required"
+                message: "Valid username (3-100), email, password (12 characters minimum, 72 UTF-8 bytes maximum) and workspace role required"
             });
         }
 
