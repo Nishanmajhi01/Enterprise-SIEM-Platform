@@ -680,9 +680,10 @@ true
 
 await incident.save();
 
-
-
-
+try {
+  const { emitToUser } = require("../utils/socketEmitter");
+  emitToUser(req.workspaceId, user.id, "incident-assigned", { incidentId: incident.id, title: incident.title, severity: incident.severity });
+} catch (notifyError) { console.error("Assignment notification failed:", notifyError.message); }
 
 await createAuditLog({
             workspaceId: req.workspaceId,
@@ -1281,4 +1282,17 @@ exports.manualContainIncident = async (req, res) => {
                 : "Unable to record manual containment"
         });
     }
+};
+
+// Workspace-scoped task inbox and assignment history. No new database tables required.
+exports.getAssignmentInbox = async (req, res) => {
+  try {
+    const incidents = await Incident.findAll({ where: { workspaceId: req.workspaceId }, order: [["createdAt", "DESC"]] });
+    const userId = Number(req.user?.id);
+    if (!Number.isSafeInteger(userId)) return res.status(401).json({ message: "Authentication required" });
+    const tasks = incidents.filter(i => Number(i.assignedTo) === userId).map(i => ({ id: i.id, title: i.title, severity: i.severity, status: i.status, assignedTo: i.assignedTo, sourceIP: i.sourceIP, createdAt: i.createdAt, assignedAt: [...(Array.isArray(i.timeline) ? i.timeline : [])].reverse().find(e => e.action === "INCIDENT_ASSIGNED" && Number(e.assignedToId) === userId)?.time || null }));
+    const notifications = incidents.flatMap(i => (Array.isArray(i.timeline) ? i.timeline : []).filter(e => e.action === "INCIDENT_ASSIGNED" && Number(e.assignedToId) === userId).map((e, idx) => ({ id: `${i.id}:${e.time || idx}`, incidentId: i.id, title: i.title, severity: i.severity, assignedBy: e.assignedBy || e.user || "Unknown", time: e.time || null }))).sort((a,b) => new Date(b.time || 0) - new Date(a.time || 0)).slice(0, 100);
+    const overview = req.workspaceRole === "ADMIN" ? incidents.map(i => ({ id: i.id, title: i.title, severity: i.severity, status: i.status, assignedTo: i.assignedTo, createdAt: i.createdAt })) : null;
+    res.json({ tasks, notifications, overview });
+  } catch (error) { res.status(500).json({ message: "Unable to load assignment inbox" }); }
 };
