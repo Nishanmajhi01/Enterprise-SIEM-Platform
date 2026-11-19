@@ -112,6 +112,32 @@ router.get(
     }
 );
 
+
+// Active assignable members, accessible to workspace administrators and analysts.
+router.get("/assignable-members", authenticate,
+    require("../middleware/workspaceAuth"),
+    require("../middleware/workspaceRbac")(["ADMIN", "ANALYST"]),
+    async (req, res) => {
+        try {
+            const WorkspaceMembership = require("../models/WorkspaceMembership");
+            const User = require("../models/User");
+            require("../models/associations");
+            const members = await WorkspaceMembership.findAll({
+                where: { workspaceId: req.workspaceId, status: "ACTIVE", role: ["ADMIN", "ANALYST"] },
+                attributes: ["role"],
+                include: [{ model: User, as: "user", required: true, attributes: ["id", "username", "email"] }],
+                order: [["createdAt", "ASC"]]
+            });
+            return res.json({ members: members.map(m => ({
+                id: m.user.id, username: m.user.username, email: m.user.email, role: m.role
+            })) });
+        } catch (error) {
+            console.error("Unable to list assignable members:", error);
+            return res.status(500).json({ message: "Unable to load assignable members" });
+        }
+    }
+);
+
 /*
  * Legacy temporary-password workspace provisioning is retired.
  * Members must join using a single-use email invitation.
