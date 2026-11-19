@@ -21,4 +21,4 @@ jobs:
       - name: Check JavaScript syntax
         run: find . -path './node_modules' -prune -o -name '*.js' -type f -print0 | xargs -0 -n1 node --check
       - name: Run realtime workspace isolation tests
-        run: node --test tests/socketEmitterWorkspace.test.js
+        run: node --test tests/socketEmitterWorkspace.test.js tests/corsOrigins.test.js
