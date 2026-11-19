@@ -16,6 +16,16 @@ async function detectPhishing(url, workspaceId){
 
 
 
+    // Ignore non-web schemes and malformed inputs; never alert on arbitrary text.
+    if (typeof url !== "string" || url.length > 2048) return false;
+    let parsed;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return false;
+    }
+    if (!["http:", "https:"].includes(parsed.protocol) || !parsed.hostname) return false;
+
     const suspiciousWords = [
 
         "login",
@@ -44,7 +54,8 @@ async function detectPhishing(url, workspaceId){
     for(let word of suspiciousWords){
 
 
-        if(url.toLowerCase().includes(word)){
+        // Search URL path and query, not benign hostname substrings.
+        if((parsed.pathname + parsed.search).toLowerCase().includes(word)){
 
 
             found = true;
