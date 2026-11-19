@@ -1,0 +1,24 @@
+name: Backend syntax and realtime tests
+
+on:
+  push:
+    branches:
+      - feature/public-workspace-signup
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Check JavaScript syntax
+        run: find . -path './node_modules' -prune -o -name '*.js' -type f -print0 | xargs -0 -n1 node --check
+      - name: Run realtime workspace isolation tests
+        run: node --test tests/socketEmitterWorkspace.test.js
