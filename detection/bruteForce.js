@@ -7,7 +7,17 @@ const {
 // Temporary in-memory failed-login tracker.
 // Key = source IP
 // Value = array of timestamps.
-const attempts = {};
+const attempts = new Map();
+const pendingAlerts = new Set();
+
+// Remove expired counters to avoid unbounded memory growth.
+function pruneExpiredAttempts(now) {
+    for (const [key, timestamps] of attempts) {
+        const recent = timestamps.filter(time => now - time <= WINDOW_MS);
+        if (recent.length === 0) attempts.delete(key);
+        else if (recent.length !== timestamps.length) attempts.set(key, recent);
+    }
+}
 
 
 // 5 failed logins within 2 minutes
@@ -70,13 +80,11 @@ async function detectBruteForce(event) {
     ==========================================
     */
 
-    if (!attempts[attemptKey]) {
-        attempts[attemptKey] = [];
-    }
-
     const now = Date.now();
-
-    attempts[attemptKey].push(now);
+    pruneExpiredAttempts(now);
+    if (pendingAlerts.has(attemptKey)) return null;
+    const recent = attempts.get(attemptKey) || [];
+    recent.push(now);
 
 
     /*
@@ -85,11 +93,8 @@ async function detectBruteForce(event) {
     ==========================================
     */
 
-    attempts[attemptKey] = attempts[attemptKey].filter(
-        time => now - time <= WINDOW_MS
-    );
-
-    const recentAttempts = attempts[attemptKey];
+    const recentAttempts = recent.filter(time => now - time <= WINDOW_MS);
+    attempts.set(attemptKey, recentAttempts);
 
     console.log(
         `FAILED LOGIN: ${ip} | Attempts: ${recentAttempts.length}/${THRESHOLD}`
@@ -113,6 +118,8 @@ async function detectBruteForce(event) {
     ==========================================
     */
 
+    pendingAlerts.add(attemptKey);
+    try {
     const alert = await createSecurityAlert({
         workspaceId,
 
@@ -154,10 +161,11 @@ async function detectBruteForce(event) {
     ==========================================
     */
 
-    attempts[attemptKey] = [];
-
-
+    attempts.delete(attemptKey);
     return alert;
+    } finally {
+        pendingAlerts.delete(attemptKey);
+    }
 }
 
 
