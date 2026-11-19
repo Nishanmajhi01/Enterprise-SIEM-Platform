@@ -554,9 +554,9 @@ message:"Incident not found"
 
 
 // SECURITY: Prevent assigning closed incidents.
-if (incident.status === "CLOSED") {
+if (["CLOSED", "RESOLVED"].includes(incident.status)) {
     return res.status(409).json({
-        message: "Closed incidents cannot be assigned"
+        message: "Resolved or closed incidents cannot be assigned"
     });
 }
 
@@ -567,6 +567,8 @@ require("../models/User");
 
 const WorkspaceMembership =
 require("../models/WorkspaceMembership");
+
+if (!req.user?.id) return res.status(401).json({message:"Authenticated assigning user required"});
 
 const userId = Number(req.body?.userId);
 
@@ -639,8 +641,9 @@ user.id;
 
 
 
-incident.status =
-"INVESTIGATING";
+if (["OPEN", "ACKNOWLEDGED"].includes(incident.status)) {
+incident.status = "INVESTIGATING";
+}
 
 
 
@@ -653,13 +656,16 @@ incident.timeline || [];
 incident.timeline.push({
 
 action:"INCIDENT_ASSIGNED",
-
+user: req.user.username || "UNKNOWN",
+userId: req.user.id,
 assignedTo:user.username,
+assignedToId:user.id,
+assignedToEmail:user.email,
 
 assignedRole:membership.role,
 
 assignedBy:
-req.user?.username || "SYSTEM",
+req.user.username || "UNKNOWN",
 
 time:new Date()
 
