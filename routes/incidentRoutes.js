@@ -99,6 +99,9 @@ getIncidents
 
 
 
+// Current user task inbox (must precede /:id).
+router.get("/assignment-inbox", authenticate, workspaceAuth, rbac(["ADMIN","ANALYST","VIEWER"]), require("../controllers/incidentController").getAssignmentInbox);
+
 // GET SINGLE INCIDENT
 
 router.get(
