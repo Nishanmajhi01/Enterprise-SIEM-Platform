@@ -9,6 +9,7 @@ require("./models/Evidence");
 
 const express = require("express");
 const cors = require("cors");
+const { corsOrigin } = require("./config/corsOrigins");
 const helmet = require("helmet");
 const http = require("http");
 
@@ -23,7 +24,7 @@ const app = express();
  */
 app.use(cors({
 
-    origin:"http://localhost:5173",
+    origin: corsOrigin,
 
     credentials:true
 
