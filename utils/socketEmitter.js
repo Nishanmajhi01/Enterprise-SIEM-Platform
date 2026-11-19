@@ -55,6 +55,8 @@ exports.emitAlert = (alert)=>{
         {
 
 
+            workspaceId,
+
             id:
             alert.id,
 
@@ -156,6 +158,8 @@ exports.emitIncident = (incident)=>{
         "security-incident",
         {
 
+
+            workspaceId,
 
             id:
             incident.id,
