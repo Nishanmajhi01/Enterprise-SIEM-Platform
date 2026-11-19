@@ -9,6 +9,7 @@ const {
 // Value = array of timestamps.
 const attempts = new Map();
 const pendingAlerts = new Set();
+const MAX_TRACKERS = 10000;
 
 // Remove expired counters to avoid unbounded memory growth.
 function pruneExpiredAttempts(now) {
@@ -83,6 +84,8 @@ async function detectBruteForce(event) {
     const now = Date.now();
     pruneExpiredAttempts(now);
     if (pendingAlerts.has(attemptKey)) return null;
+    // Cap distinct sources to prevent unbounded state growth under spoofed traffic.
+    if (!attempts.has(attemptKey) && attempts.size >= MAX_TRACKERS) return null;
     const recent = attempts.get(attemptKey) || [];
     recent.push(now);
 
