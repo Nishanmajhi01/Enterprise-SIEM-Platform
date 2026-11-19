@@ -98,6 +98,7 @@ const initSocket = (server) => {
 
     io.on("connection", (socket) => {
         socket.join(`workspace:${socket.data.workspaceId}`);
+        socket.join(`workspace:${socket.data.workspaceId}:user:${socket.data.userId}`);
 
         console.log(
             "SOC Dashboard Connected:",
