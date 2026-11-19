@@ -210,3 +210,8 @@ exports.emitIncident = (incident)=>{
 
 
 };
+// Emit only to the authenticated member room within this workspace.
+exports.emitToUser = (workspaceId, userId, event, payload) => {
+  if (!io || !/^[0-9a-f-]{36}$/i.test(String(workspaceId)) || !Number.isSafeInteger(Number(userId)) || !["incident-assigned"].includes(event)) return;
+  io.to(`workspace:${workspaceId}:user:${userId}`).emit(event, { ...payload, workspaceId });
+};
