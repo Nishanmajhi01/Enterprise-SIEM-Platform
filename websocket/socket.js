@@ -1,4 +1,5 @@
 const { Server } = require("socket.io");
+const { corsOrigin } = require("../config/corsOrigins");
 const { setIO } = require("../utils/socketEmitter");
 const jwt = require("jsonwebtoken");
 const Workspace = require("../models/Workspace");
@@ -20,7 +21,7 @@ const initSocket = (server) => {
 
         cors: {
 
-            origin: "http://localhost:5173",
+            origin: corsOrigin,
 
             methods: [
                 "GET",
