@@ -65,7 +65,7 @@ while (!cancellation.IsCancellationRequested)
                 response.EnsureSuccessStatusCode();
                 File.WriteAllText(path + ".tmp", id.ToString());
                 File.Move(path + ".tmp", path, true);
-                Console.WriteLine($"Forwarded {channel} record {id}");
+                File.WriteAllText(Path.Combine(directory, "last-success.txt"), DateTimeOffset.UtcNow.ToString("o"));
             }
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { break; }
