@@ -1,20 +1,26 @@
 using System.Diagnostics.Eventing.Reader;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 
-var endpoint = Environment.GetEnvironmentVariable("NEXUS_INGEST_URL");
-var key = Environment.GetEnvironmentVariable("NEXUS_DEVICE_KEY");
+var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "NexusSIEM-Agent");
+using var config = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "config.json")));
+var endpoint = config.RootElement.GetProperty("url").GetString();
+var allowLabHttp = config.RootElement.GetProperty("allowLabHttp").GetBoolean();
+var bytes = ProtectedData.Unprotect(File.ReadAllBytes(Path.Combine(directory, "key.bin")), null, DataProtectionScope.LocalMachine);
+var key = Encoding.UTF8.GetString(bytes);
+CryptographicOperations.ZeroMemory(bytes);
 if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ||
     (uri.Scheme != "https" && !(uri.Scheme == "http" &&
-      Environment.GetEnvironmentVariable("NEXUS_ALLOW_LAB_HTTP") == "true")) ||
+      allowLabHttp)) ||
     string.IsNullOrWhiteSpace(key))
 {
-    Console.Error.WriteLine("Configure NEXUS_INGEST_URL and NEXUS_DEVICE_KEY. HTTPS required unless explicitly enabled for a trusted lab.");
+    Console.Error.WriteLine("Invalid agent configuration. HTTPS required unless explicitly enabled for a trusted lab.");
     return;
 }
-using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(20) };
 client.DefaultRequestHeaders.Add("x-api-key", key);
-var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NexusSIEM");
 Directory.CreateDirectory(directory);
 var channels = new[] { "Security", "System", "Application", "Microsoft-Windows-Windows Defender/Operational" };
 using var cancellation = new CancellationTokenSource();
