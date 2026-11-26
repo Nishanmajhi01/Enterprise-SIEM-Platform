@@ -1409,7 +1409,12 @@ const ddosResult = detectDDoSV2(securityEvent);
                 portScanResult.detected &&
                 !portScanResult.shouldAlert;
 
-            if (!suppressPortScanNotification) {
+            const hasDetection = ruleResult.alerts.length > 0 ||
+                matchedIOCs.length > 0 || malwareResult.detected ||
+                phishingResult.detected || portScanResult.shouldAlert ||
+                risk.score >= INCIDENT_RISK_THRESHOLD;
+
+            if (!suppressPortScanNotification && hasDetection) {
 
             emitAlert({
 
