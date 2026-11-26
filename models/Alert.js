@@ -88,6 +88,11 @@ title: {
 
 
 
+    destinationIP: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+
     attackType: {
 
         type: DataTypes.STRING
