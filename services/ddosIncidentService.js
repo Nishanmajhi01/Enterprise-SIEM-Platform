@@ -246,6 +246,7 @@ async function createDDoSIncident(result, options = {}) {
             description: incident.description,
             severity,
             sourceIP: result.sourceIP || null,
+            destinationIP: result.destinationIP,
             attackType: "DDOS",
             riskScore,
             status: "NEW",
