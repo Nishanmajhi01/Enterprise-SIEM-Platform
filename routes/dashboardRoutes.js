@@ -14,4 +14,6 @@ router.get(
   getDashboardStats
 );
 
+router.get("/report/pdf", authenticate, workspaceAuth, workspaceRbac("ADMIN", "ANALYST"), require("../controllers/reportController").downloadReport);
+
 module.exports = router;
