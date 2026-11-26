@@ -26,6 +26,7 @@ exports.createAlert = async (req, res) => {
             severity: req.body.severity || "LOW",
 
             sourceIP: req.body.sourceIP,
+            destinationIP: req.body.destinationIP || null,
 
             attackType: req.body.attackType,
 
@@ -206,7 +207,8 @@ exports.createAlert = async(req,res)=>{
 
             severity:req.body.severity || "LOW",
 
-            sourceIP:req.body.sourceIP,
+            sourceIP: req.body.sourceIP,
+            destinationIP: req.body.destinationIP || null,
 
             attackType:req.body.attackType,
 
