@@ -1,0 +1,70 @@
+using System.Diagnostics.Eventing.Reader;
+using System.Net.Http.Json;
+using System.Text.Json;
+
+var endpoint = Environment.GetEnvironmentVariable("NEXUS_INGEST_URL");
+var key = Environment.GetEnvironmentVariable("NEXUS_DEVICE_KEY");
+if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ||
+    (uri.Scheme != "https" && !(uri.Scheme == "http" &&
+      Environment.GetEnvironmentVariable("NEXUS_ALLOW_LAB_HTTP") == "true")) ||
+    string.IsNullOrWhiteSpace(key))
+{
+    Console.Error.WriteLine("Configure NEXUS_INGEST_URL and NEXUS_DEVICE_KEY. HTTPS required unless explicitly enabled for a trusted lab.");
+    return;
+}
+using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+client.DefaultRequestHeaders.Add("x-api-key", key);
+var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NexusSIEM");
+Directory.CreateDirectory(directory);
+var channels = new[] { "Security", "System", "Application", "Microsoft-Windows-Windows Defender/Operational" };
+using var cancellation = new CancellationTokenSource();
+Console.CancelKeyPress += (_, e) => { e.Cancel = true; cancellation.Cancel(); };
+while (!cancellation.IsCancellationRequested)
+{
+    foreach (var channel in channels)
+    {
+        if (cancellation.IsCancellationRequested) break;
+        try
+        {
+            var path = Path.Combine(directory, channel.Replace('/', '_') + ".checkpoint");
+            long cursor;
+            if (!File.Exists(path))
+            {
+                using var latest = new EventLogReader(new EventLogQuery(channel, PathType.LogName) { ReverseDirection = true });
+                using var record = latest.ReadEvent();
+                cursor = record?.RecordId ?? 0;
+                File.WriteAllText(path, cursor.ToString());
+            }
+            else cursor = long.Parse(File.ReadAllText(path));
+            var query = new EventLogQuery(channel, PathType.LogName, $"*[System[EventRecordID > {cursor}]]");
+            using var reader = new EventLogReader(query);
+            for (int i = 0; i < 100 && !cancellation.IsCancellationRequested; i++)
+            {
+                using var record = reader.ReadEvent();
+                if (record == null) break;
+                if (record.RecordId is not long id) continue;
+                string? message;
+                try { message = record.FormatDescription(); }
+                catch (EventLogException) { message = null; }
+                var payload = new {
+                    eventType = channel == "Security" ? "WINDOWS_SECURITY" : "WINDOWS_EVENT",
+                    hostname = Environment.MachineName,
+                    channel, eventId = record.Id, recordId = id,
+                    provider = record.ProviderName,
+                    eventTime = record.TimeCreated?.ToUniversalTime(),
+                    message = message ?? $"Windows event {record.Id}",
+                    severity = record.Level is 1 or 2 ? "MEDIUM" : "LOW"
+                };
+                using var response = await client.PostAsJsonAsync(uri, payload, cancellation.Token);
+                response.EnsureSuccessStatusCode();
+                File.WriteAllText(path + ".tmp", id.ToString());
+                File.Move(path + ".tmp", path, true);
+                Console.WriteLine($"Forwarded {channel} record {id}");
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { break; }
+        catch (Exception ex) { Console.Error.WriteLine($"{channel}: {ex.GetType().Name}; will retry."); }
+    }
+    try { await Task.Delay(TimeSpan.FromSeconds(10), cancellation.Token); }
+    catch (OperationCanceledException) { break; }
+}
