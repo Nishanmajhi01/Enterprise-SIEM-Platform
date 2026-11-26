@@ -138,6 +138,8 @@ async function detectBruteForce(event) {
         sourceIP:
             ip,
 
+        destinationIP: event.destinationIP || null,
+
         attackType:
             "BRUTE_FORCE",
 
