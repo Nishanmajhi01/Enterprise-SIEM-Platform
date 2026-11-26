@@ -57,6 +57,7 @@ exports.createSecurityAlert = async(data)=>{
 
             sourceIP:
             data.sourceIP || null,
+            destinationIP: data.destinationIP || null,
 
 
 
