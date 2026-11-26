@@ -1,0 +1,27 @@
+name: Windows agent build
+on:
+  push:
+    paths:
+      - 'agents/windows/**'
+      - '.github/workflows/windows-agent.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish agent
+        run: dotnet publish agents/windows/Nexus.Agent.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o package
+      - name: Include installer
+        shell: pwsh
+        run: |
+          Copy-Item agents/windows/Install.ps1,agents/windows/Uninstall.ps1,agents/windows/README.md package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NexusSIEM-Windows-x64
+          path: package/
