@@ -25,8 +25,22 @@ Directory.CreateDirectory(directory);
 var channels = new[] { "Security", "System", "Application", "Microsoft-Windows-Windows Defender/Operational" };
 using var cancellation = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cancellation.Cancel(); };
+var heartbeatUri = new Uri(uri.AbsoluteUri.TrimEnd('/') + "/heartbeat");
+var nextHeartbeat = DateTimeOffset.MinValue;
 while (!cancellation.IsCancellationRequested)
 {
+    if (DateTimeOffset.UtcNow >= nextHeartbeat)
+    {
+        try
+        {
+            using var heartbeat = await client.PostAsJsonAsync(heartbeatUri, new { hostname = Environment.MachineName }, cancellation.Token);
+            heartbeat.EnsureSuccessStatusCode();
+            File.WriteAllText(Path.Combine(directory, "last-heartbeat.txt"), DateTimeOffset.UtcNow.ToString("o"));
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { break; }
+        catch (Exception ex) { Console.Error.WriteLine($"Heartbeat: {ex.GetType().Name}"); }
+        nextHeartbeat = DateTimeOffset.UtcNow.AddSeconds(60);
+    }
     foreach (var channel in channels)
     {
         if (cancellation.IsCancellationRequested) break;
