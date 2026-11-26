@@ -1193,6 +1193,7 @@ const ddosResult = detectDDoSV2(securityEvent);
                             severity: risk.level,
                             status: "NEW",
                             sourceIP: securityEvent.sourceIP || null,
+                        destinationIP: securityEvent.destinationIP || null,
                             attackType: "PORT_SCAN",
                             riskScore: risk.score,
                             mitreTechnique: mitre?.technique || null,
@@ -1226,6 +1227,7 @@ const ddosResult = detectDDoSV2(securityEvent);
                         severity: risk.level,
                         status: "NEW",
                         sourceIP: securityEvent.sourceIP || null,
+                        destinationIP: securityEvent.destinationIP || null,
                         attackType: "MALWARE",
                         riskScore: risk.score,
                         mitreTechnique:
@@ -1253,6 +1255,7 @@ const ddosResult = detectDDoSV2(securityEvent);
                         severity: risk.level,
                         status: "NEW",
                         sourceIP: securityEvent.sourceIP || null,
+                        destinationIP: securityEvent.destinationIP || null,
                         attackType: "PHISHING",
                         riskScore: risk.score,
                         mitreTechnique: "T1566",
@@ -1420,7 +1423,7 @@ const ddosResult = detectDDoSV2(securityEvent);
 
                 workspaceId: securityEvent.workspaceId,
                 id:
-                    persistedPortScanAlert?.id || securityEvent.id,
+                    persistedPortScanAlert?.id || persistedMalwareAlert?.id || persistedPhishingAlert?.id || securityEvent.id,
 
                 title:
                     buildAlertTitle(
