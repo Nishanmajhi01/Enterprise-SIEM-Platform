@@ -316,3 +316,14 @@ exports.checkFileHash = async (hash) => {
     }
 
 };
+// Read-only reputation lookup; never submit a URL for scanning.
+exports.checkURL = async (url) => {
+    const id = Buffer.from(url, "utf8").toString("base64url");
+    try {
+        const response = await axios.get(`${VT_BASE_URL}/urls/${id}`, {headers: getHeaders(), timeout: 3000});
+        const stats = response.data?.data?.attributes?.last_analysis_stats;
+        return {available: !!stats, found: true, malicious: stats?.malicious ?? null, suspicious: stats?.suspicious ?? null};
+    } catch (error) {
+        return {available: error.response?.status === 404, found: error.response?.status === 404 ? false : null, malicious: null, suspicious: null};
+    }
+};
