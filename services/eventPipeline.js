@@ -1661,6 +1661,8 @@ function buildAlertTitle(
     }
 
 
+    if (securityEvent.attackType === "MALWARE") return "Malware Detected - Malicious File Hash";
+    if (securityEvent.attackType === "PHISHING") return "Phishing URL Detected";
     return "Security Event Detected";
 
 }
