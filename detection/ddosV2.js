@@ -53,6 +53,7 @@ function detectDDoSV2(event) {
         return { detected: false, shouldAlert: false };
     }
 
+    const destinationKey = JSON.stringify([event.workspaceId || "standalone-test", destinationIP]);
     const now = Date.now();
 
     // Prevent unbounded growth during long-running operation.
@@ -75,7 +76,7 @@ function detectDDoSV2(event) {
     }
 
     if (
-        !traffic.has(destinationIP) &&
+        !traffic.has(destinationKey) &&
         traffic.size >= CONFIG.MAX_DESTINATIONS
     ) {
         return {
@@ -85,14 +86,14 @@ function detectDDoSV2(event) {
         };
     }
 
-    const entries = traffic.get(destinationIP) || [];
+    const entries = traffic.get(destinationKey) || [];
 
     entries.push({
         sourceIP,
         time: now
     });
 
-    traffic.set(destinationIP, entries);
+    traffic.set(destinationKey, entries);
 
     const sourceCounts = new Map();
 
@@ -127,8 +128,8 @@ function detectDDoSV2(event) {
         : "SINGLE_SOURCE_FLOOD";
 
     const cooldownKey = distributed
-        ? `DISTRIBUTED:${destinationIP}`
-        : `SINGLE:${sourceIP}:${destinationIP}`;
+        ? `DISTRIBUTED:${destinationKey}`
+        : JSON.stringify(["SINGLE", sourceIP, destinationKey]);
 
     const shouldAlert = !cooldowns.has(cooldownKey);
 
