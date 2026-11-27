@@ -1,9 +1,10 @@
 /**
  * Enterprise SIEM - Phishing V2
- * Offline URL heuristic detection.
+ * Offline URL heuristic detection with optional read-only reputation lookup.
  * Does not visit URLs or execute response actions.
  */
 
+const { checkURL } = require("../services/virusTotalService");
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 
 function extractURLs(event) {
@@ -123,6 +124,24 @@ async function detectPhishingV2(event) {
     const results = urls
         .map(analyseURL)
         .filter(Boolean);
+
+    // Opt-in only: URLs may contain sensitive information. Never send query strings,
+    // credentials, fragments or internal hosts. Limit to one lookup per event.
+    if (process.env.PHISHING_VT_ENABLED === "true") {
+        const candidate = [...results].sort((a,b) => b.score-a.score).find(item => {
+            const u = new URL(item.url);
+            return item.score >= 25 && /^[a-z0-9.-]+\\.[a-z]{2,}$/i.test(u.hostname) &&
+                !/\\.(local|internal|test|invalid|example|localhost|lan|home|corp)$/i.test(u.hostname) &&
+                !u.username && !u.password && !u.search && !u.hash && u.pathname === "/";
+        });
+        if (candidate) {
+            candidate.reputation = await checkURL(candidate.url);
+            if (candidate.reputation.available && candidate.reputation.malicious > 0) {
+                candidate.indicators.push("VIRUSTOTAL_MALICIOUS_URL");
+                candidate.score = Math.max(candidate.score, 80);
+            }
+        }
+    }
 
     const strongest = results
         .sort((a, b) => b.score - a.score)[0];
